@@ -107,25 +107,27 @@ function host() {
   local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
   local hostid=${1%%:*}; build_key -v hostid "$hostid"
   local dname=${1%%:*}; shift
-  local addr=$1; shift
   local attrs=( )
 
-  CURRENT_HOST="$hostid"  
-  if [[ $addr == --template ]]; then
+  CURRENT_HOST="$hostid"
+  
+  if [[ ${1} == --template ]]; then
     HOST_TEMPLATE=1
     attrs=(
       register=0
       name="$hostid"
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
-  else
+  elif [[ ${1:0:10} == --address= ]]; then
     HOST_TEMPLATE=0
     attrs=(
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
       host_name="$hostid"
       display_name="$dname"
-      address="$addr"
+      address="${1:10}"
     )
+  else
+    fatal "bad parameter $1, bypass"
   fi
 
   dump_nagios_object host "${attrs[@]}" "$@"
