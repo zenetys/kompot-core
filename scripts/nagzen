@@ -83,7 +83,7 @@ function build_key() {
  
   [[ $1 == -v ]] && key=$2 value=$3 || key=REPLY value=$1
   
-  value=${value,,}; value=${value//[^0-9a-z]/_}
+  value=${value,,}; value=${value//[^0-9a-z:-]/_}
   printf -v $key "%s" "$value"
 }
 
@@ -103,50 +103,81 @@ function addHost() {
 }
 
 function host() {
+  debug "$FUNCNAME $*"
   local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
   local hostid=${1%%:*}; build_key -v hostid "$hostid"
   local dname=${1%%:*}; shift
   local addr=$1; shift
   local attrs=( )
-  
+
+  CURRENT_HOST="$hostid"  
   if [[ $addr == --template ]]; then
-    IS_TEMPLATE=1
-    C_HOST=""
+    HOST_TEMPLATE=1
     attrs=(
       register=0
       name="$hostid"
-      use="${use:-HOST_DEFAULT_USE}"
+      use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
   else
-    IS_TEMPLATE=0
-    C_HOST="$hostid"
+    HOST_TEMPLATE=0
     attrs=(
-      use="${use:-$HOST_DEFAULT_USE}"
+      use="${use:-$DEFAULT_HOST_TEMPLATE}"
       host_name="$hostid"
       display_name="$dname"
       address="$addr"
     )
   fi
 
-  echo "# H: host_name=$hostid use=${use:-generic_host} display_name='$dname' $*"
   dump_nagios_object host "${attrs[@]}" "$@"
+
+  if [[ $HOST_TEMPLATE == 0 && $use ]]; then
+    for service in ${HOST_SERVICES[$use]//,/$IFS}; do
+      host-service $service:$use:${service}
+    done  
+  fi
+
+}
+
+function host-end() {
+  unset CURRENT_HOST
+  unset HOST_TEMPLATE
 }
 
 function host-service() {
+  debug "$FUNCNAME $*"
   local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
-  local desc=${1%%:*}
-  local dname=${1%%:*} shift
+  local desc=${1%%:*}; build_key -v desc "$desc"
+  local dname=${1%%:*}; shift
   local attrs=( )
   
   if [[ $1 == --template ]]; then
+    shift
     attrs=(
-      use="${use:-$SERVICE_DEFAULT_USE}"
-      host_name="$hostid"
+      register=0
+      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
+      name="$desc"
       display_name="$dname"
     )
+  elif [[ $HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
+    attrs=(
+      register=0
+      use=${use:-$desc}
+      name="$CURRENT_HOST:$desc"
+      display_name="$dname"
+    )
+    HOST_SERVICES[$CURRENT_HOST]+="$desc,"
+  elif [[ $HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
+    attrs=(
+      use=${use:-$desc}
+      service_description="$desc"
+      display_name="$dname"
+      host_name=$CURRENT_HOST
+    )
+  else
+    warning "ignore service declaration out of context nor template"
+    return 1
   fi
 
-  echo "S: service_description=$desc use=$use display_name=$dname"
   dump_nagios_object service "${attrs[@]}" "$@"
 }
 
@@ -154,14 +185,15 @@ function service() {
   host-service "$@"
 }
 
-declare GENERIC_HOST=generic_host
-declare GENERIC_SERVICE=generic_service
+declare DEFAULT_HOST_TEMPLATE=generic_host
+declare DEFAULT_SERVICE_TEMPLATE=generic_service
 
 declare VERBOSE=1
 declare XDEBUG=0
 declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
+declare -A HOST_SERVICES=( )
 
 while (( $# > 0 )); do
   case "$1" in
