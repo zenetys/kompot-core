@@ -1,0 +1,205 @@
+#!/bin/bash
+#
+# Copyright: 2021 ZENETYS
+# Author: Benoit DOLEZ <bdolez@zenetys.com>
+# License: MIT License (http://opensource.org/licenses/MIT)
+# Version: 0.1
+#
+
+export LC_ALL=C
+shopt -s nullglob
+set -o pipefail
+set -f
+
+PROGNAME=${0##*/}
+USAGE="${PROGNAME} [OPTIONS] {-f FILENAME|ACTION ...}"
+
+function info() {
+    local i;
+    local d=$(date +%Y-%m-%dT%H:%M:%S.%3N%z);
+    local l=info
+    [[ ${1:0:2} == -- ]] && l=${1:2} && shift
+    for i in "$@"; do
+        printf '%s %s %s%s%s %s: %s\n' "$d" "$HOSTNAME" "${C[$l]}" "$l" "${C[reset]}" "$PROGNAME" "$i";
+    done
+}
+
+function fatal() {
+    local usage=0
+    [[ $1 == --usage ]] && usage=1 && shift
+    info --${FUNCNAME[0]} "$@"
+    (( $usage )) && usage
+    exit 127
+}
+
+function error() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function warning() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function debug() {
+    (( DEBUG == 0 )) && return 0
+    info --${FUNCNAME[0]} "$@"
+}
+
+function usage() {
+  local IFS=$'\t'
+  exec >&2
+  if [[ $0 == "-bash" ]] ; then return 1 ; fi
+  [[ $# -gt 0 ]] && echo "ERROR: $*"
+  version
+  echo "Usage: $USAGE"
+  echo "Options:"
+  sed -nr "s/^[[:space:]]*## ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %-20s %s\n" "$OPT" "$DESC"
+    done
+  echo
+  
+  echo "<ACTION> is one of :"
+  sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %s\n     %s\n" "$OPT" "$DESC"
+    done
+  echo
+
+  return 0
+}
+
+function version() {
+  local PROGFILE=$0
+  local VERSION=$(sed -n 's/^# Version: //p' $PROGFILE)
+  local AUTHOR=$(sed -n 's/^# Author: //p' $PROGFILE)
+  local LICENSE=$(sed -n 's/^# License: //p' $PROGFILE)
+
+  echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
+}
+
+function build_key() {
+  local value key
+ 
+  [[ $1 == -v ]] && key=$2 value=$3 || key=REPLY value=$1
+  
+  value=${value,,}; value=${value//[^0-9a-z]/_}
+  printf -v $key "%s" "$value"
+}
+
+function dump_nagios_object() {
+  local type=$1; shift
+
+  echo "define $type {"
+  for field in "$@"; do
+    printf "  %-20s %s\n" "${field%%=*}" "${field#*=}"
+  done
+  echo "}"
+}
+
+# X-ACTION addHost NAME [ATTRS]: add host with attributs
+function addHost() {
+  fatal not-implemented
+}
+
+function host() {
+  local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
+  local hostid=${1%%:*}; build_key -v hostid "$hostid"
+  local dname=${1%%:*}; shift
+  local addr=$1; shift
+  local attrs=( )
+  
+  if [[ $addr == --template ]]; then
+    IS_TEMPLATE=1
+    C_HOST=""
+    attrs=(
+      register=0
+      name="$hostid"
+      use="${use:-HOST_DEFAULT_USE}"
+    )
+  else
+    IS_TEMPLATE=0
+    C_HOST="$hostid"
+    attrs=(
+      use="${use:-$HOST_DEFAULT_USE}"
+      host_name="$hostid"
+      display_name="$dname"
+      address="$addr"
+    )
+  fi
+
+  echo "# H: host_name=$hostid use=${use:-generic_host} display_name='$dname' $*"
+  dump_nagios_object host "${attrs[@]}" "$@"
+}
+
+function host-service() {
+  local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
+  local desc=${1%%:*}
+  local dname=${1%%:*} shift
+  local attrs=( )
+  
+  if [[ $1 == --template ]]; then
+    attrs=(
+      use="${use:-$SERVICE_DEFAULT_USE}"
+      host_name="$hostid"
+      display_name="$dname"
+    )
+  fi
+
+  echo "S: service_description=$desc use=$use display_name=$dname"
+  dump_nagios_object service "${attrs[@]}" "$@"
+}
+
+function service() {
+  host-service "$@"
+}
+
+declare GENERIC_HOST=generic_host
+declare GENERIC_SERVICE=generic_service
+
+declare VERBOSE=1
+declare XDEBUG=0
+declare -a ARGS=( )
+declare -A HOSTS=( )
+declare -A SERVICES=( )
+
+while (( $# > 0 )); do
+  case "$1" in
+    ## -h, --help: This help
+    -h|--help) usage && exit 0 ;;
+    ## -V, --version: Show version
+    -V|--version) version && exit 0 ;;
+    ## --x-debug: Enable bash debug mode
+    --x-debug)    XDEBUG=1 ;;
+    ## -v, --verbose: Define verbose level (must be repeat)
+    -v|--verbose) ((VERBOSE++)) ;;
+    ## -q, --quiet: Set verbose level to 0
+    -q|--quiet) ((VERBOSE=0)) ;;
+    ## -f, --source: Filename to source, or stdin if last argument
+    -f|--source) SOURCE=$2; shift;;
+    -*) usage "Unknown parameter '$1'" && exit 1 ;;
+    *) ARGS+=( "$1" ) ;;
+  esac
+  shift
+done
+
+[[ $XDEBUG == 1 ]] && set -x
+
+####################################################
+## main program starts here
+####################################################
+
+[[ $SOURCE == - ]] && SOURCE=/dev/stdin
+
+[[ -r $SOURCE ]] && source $SOURCE && exit $?
+
+[[ -z ${ARGS[@]} ]] &&
+  fatal --usage "need ACTION"
+
+ACTION=${ARGS[0]}; ARGS=( ${ARGS[@]:1} )
+
+declare -f do_$ACTION > /dev/null ||
+  fatal "undefine action '$ACTION'"
+
+
+
