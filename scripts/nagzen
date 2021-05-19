@@ -118,6 +118,7 @@ function host() {
       name="$hostid"
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
+    shift
   elif [[ ${1:0:10} == --address= ]]; then
     HOST_TEMPLATE=0
     attrs=(
@@ -126,6 +127,7 @@ function host() {
       display_name="$dname"
       address="${1:10}"
     )
+    shift
   else
     fatal "bad parameter $1, bypass"
   fi
@@ -167,7 +169,7 @@ function host-service() {
       name="$CURRENT_HOST:$desc"
       display_name="$dname"
     )
-    HOST_SERVICES[$CURRENT_HOST]+="$desc,"
+    HOST_SERVICES[$CURRENT_HOST]+="$dname,"
   elif [[ $HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
     attrs=(
       use=${use:-$desc}
