@@ -6,6 +6,8 @@
 # Version: 0.1
 #
 
+[[ $XDEBUG == 1 ]] && set -x
+
 export LC_ALL=C
 shopt -s nullglob
 set -o pipefail
@@ -20,7 +22,7 @@ function info() {
     local l=info
     [[ ${1:0:2} == -- ]] && l=${1:2} && shift
     for i in "$@"; do
-        printf '%s %s %s%s%s %s: %s\n' "$d" "$HOSTNAME" "${C[$l]}" "$l" "${C[reset]}" "$PROGNAME" "$i";
+        printf '# %s %s %s%s%s %s: %s\n' "$d" "$HOSTNAME" "${C[$l]}" "$l" "${C[reset]}" "$PROGNAME" "$i";
     done
 }
 
@@ -79,21 +81,45 @@ function version() {
 }
 
 function build_key() {
-  local value key
+  local __v __k
  
-  [[ $1 == -v ]] && key=$2 value=$3 || key=REPLY value=$1
+  [[ $1 == -v ]] && __k=$2 __v=$3 || __k=REPLY __v=$1
   
-  value=${value,,}; value=${value//[^0-9a-z:-]/_}
-  printf -v $key "%s" "$value"
+  __v=${__v,,}; __v=${__v//[^0-9a-z:-]/_}
+  printf -v $__k "%s" "$__v"
 }
 
 function dump_nagios_object() {
   local type=$1; shift
+  local attr value use name
+  local -A defined=()
 
   echo "define $type {"
   for field in "$@"; do
-    printf "  %-20s %s\n" "${field%%=*}" "${field#*=}"
+    attr="${field%%=*}"
+    value="${field#*=}"
+    
+    # save *_name value for diag
+    [[ -z $name && ${attr#*_} == "name" ]] && name=${value}
+    # key-transform 'parents' attr
+    # FIXME: do not support multiple parents
+    [[ $attr == "parents" ]] && build_key -v value "$value"
+    
+    if [[ ${attr} == "use" ]]; then
+      use="${use:+$use,}${value}"
+    elif [[ -z ${defined[${attr}]} ]]; then
+      defined[${attr}]=1
+      printf "  %-20s %s\n" "${attr}" "${value}"
+    else
+      already+=( ${attr} )
+    fi
   done
+  for attr in "${already[@]}"; do
+    warning "'$attr' for $type '$name' multiple definition, keep first"
+  done
+  if [[ $use ]]; then
+    printf "  %-20s %s\n" "use" "$use"
+  fi
   echo "}"
 }
 
@@ -132,9 +158,9 @@ function host() {
     fatal "bad parameter $1, bypass"
   fi
 
-  dump_nagios_object host "${attrs[@]}" "$@"
+  dump_nagios_object host "$@" "${attrs[@]}"
 
-  if [[ $HOST_TEMPLATE == 0 && $use ]]; then
+  if [[ $use ]]; then
     for service in ${HOST_SERVICES[$use]//,/$IFS}; do
       host-service $service:$use:${service}
     done  
@@ -182,22 +208,26 @@ function host-service() {
     return 1
   fi
 
-  dump_nagios_object service "${attrs[@]}" "$@"
+  dump_nagios_object service "$@" "${attrs[@]}"
 }
 
 function service() {
   host-service "$@"
 }
 
-declare DEFAULT_HOST_TEMPLATE=generic_host
-declare DEFAULT_SERVICE_TEMPLATE=generic_service
+declare DEFAULT_HOST_TEMPLATE=generic-host
+declare DEFAULT_SERVICE_TEMPLATE=generic-service
 
-declare VERBOSE=1
-declare XDEBUG=0
+declare VERBOSE=${VERBOSE:-1}
+declare XDEBUG=${XDEBUG:-0}
 declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
 declare -A HOST_SERVICES=( )
+
+# set
+
+(( ${#BASH_SOURCE[@]} > 1 )) && return
 
 while (( $# > 0 )); do
   case "$1" in
