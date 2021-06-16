@@ -131,56 +131,88 @@ function addHost() {
 
 function host() {
   debug "$FUNCNAME $*"
-  local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
-  local hostid=${1%%:*}; build_key -v hostid "$hostid"
+  local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
 
+  if [[ $CURRENT_HOST ]]; then
+    host-end
+  fi
+
+  build_key -v use "$use"
+  build_key -v hostid "$dname"
+
   CURRENT_HOST="$hostid"
+  HOST_TEMPLATE[$CURRENT_HOST]="$use"
+  HOST_FULLNAME[$CURRENT_HOST]="$dname"
   
-  if [[ ${1} == --template ]]; then
-    HOST_TEMPLATE=1
+  if [[ ${HOSTS[$CURRENT_HOST]} == 1 ]]; then
+    fatal "duplicate host ${HOST_FULLNAME[$CURRENT_HOST]}"
+  elif [[ ${1} == --template ]]; then
+    IS_HOST_TEMPLATE=1
     attrs=(
       register=0
       name="$hostid"
+      display_name="$dname"
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
     shift
   elif [[ ${1:0:10} == --address= ]]; then
-    HOST_TEMPLATE=0
+    IS_HOST_TEMPLATE=0
     attrs=(
-      use="${use:-$DEFAULT_HOST_TEMPLATE}"
       host_name="$hostid"
       display_name="$dname"
       address="${1:10}"
+      use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
     shift
   else
     fatal "bad parameter $1, bypass"
   fi
 
+  HOSTS[$CURRENT_HOST]=1
+
+  echo "#### $hostid${use:+:$use} ####"
   dump_nagios_object host "$@" "${attrs[@]}"
-
-  if [[ $use ]]; then
-    for service in ${HOST_SERVICES[$use]//,/$IFS}; do
-      host-service $service:$use:${service}
-    done  
-  fi
-
 }
 
 function host-end() {
+  if [[ $CURRENT_HOST ]]; then
+    if [[ ${HOST_TEMPLATE[$CURRENT_HOST]} ]]; then
+      local use=${HOST_TEMPLATE[$CURRENT_HOST]}
+      local -A services
+
+      # load already declared services
+      for service in ${HOST_SERVICES[$CURRENT_HOST]}; do
+        services[$service]=1
+      done
+
+      # declare others services
+      for service in ${HOST_SERVICES[$use]}; do
+        [[ ${services[$service]} ]] && continue
+        host-service ${service}:${use}:${service}
+      done
+    fi
+  fi
+  echo
+
   unset CURRENT_HOST
-  unset HOST_TEMPLATE
+  unset IS_HOST_TEMPLATE
 }
 
 function host-service() {
   debug "$FUNCNAME $*"
-  local use=${1#*:}; [[ -n ${1/*:*} ]] && use=""; build_key -v use "$use"
-  local desc=${1%%:*}; build_key -v desc "$desc"
+  local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
-  
+
+  build_key -v desc "$dname"
+  build_key -v use "$use"
+
+  if [[ -z $use && $CURRENT_HOST && ${HOST_TEMPLATE[$CURRENT_HOST]} ]]; then
+    use="${HOST_TEMPLATE[$CURRENT_HOST]}:$desc"
+  fi
+
   if [[ $1 == --template ]]; then
     shift
     attrs=(
@@ -189,21 +221,28 @@ function host-service() {
       name="$desc"
       display_name="$dname"
     )
-  elif [[ $HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
+    SERVICES[$desc]=1
+  elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
     attrs=(
       register=0
-      use=${use:-$desc}
+      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
       name="$CURRENT_HOST:$desc"
       display_name="$dname"
     )
-    HOST_SERVICES[$CURRENT_HOST]+="$dname,"
-  elif [[ $HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
+    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
+    SERVICES[$CURRENT_HOST:$desc]=1
+  elif [[ $IS_HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
+    if [[ ${SERVICES[$CURRENT_HOST:$desc]} == 1 ]]; then
+      fatal "duplicate service $dname for host ${HOST_FULLNAME[$CURRENT_HOST]}"
+    fi
     attrs=(
-      use=${use:-$desc}
+      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
       service_description="$desc"
       display_name="$dname"
       host_name=$CURRENT_HOST
     )
+    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
+    SERVICES[$CURRENT_HOST:$desc]=1
   else
     warning "ignore service declaration out of context nor template"
     return 1
@@ -225,6 +264,9 @@ declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
 declare -A HOST_SERVICES=( )
+declare -A HOST_TEMPLATE=( )
+declare -A HOST_FULLNAME=( )
+declare IS_HOST_TEMPLATE
 
 # set
 
