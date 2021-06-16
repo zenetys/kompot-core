@@ -22,7 +22,7 @@ function info() {
     local l=info
     [[ ${1:0:2} == -- ]] && l=${1:2} && shift
     for i in "$@"; do
-        printf '# %s %s %s%s%s %s: %s\n' "$d" "$HOSTNAME" "${C[$l]}" "$l" "${C[reset]}" "$PROGNAME" "$i";
+        printf '%s%s%s: %s\n' "${C[$l]}" "${l^^}" "${C[reset]}" "$i" >&2
     done
 }
 
