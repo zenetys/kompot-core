@@ -31,6 +31,7 @@ function fatal() {
     [[ $1 == --usage ]] && usage=1 && shift
     info --${FUNCNAME[0]} "$@"
     (( $usage )) && usage
+    trap "" EXIT
     exit 127
 }
 
@@ -226,6 +227,8 @@ declare -A SERVICES=( )
 declare -A HOST_SERVICES=( )
 
 # set
+
+trap host-end EXIT
 
 (( ${#BASH_SOURCE[@]} > 1 )) && return
 
