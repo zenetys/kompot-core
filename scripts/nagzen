@@ -210,10 +210,6 @@ function host-service() {
   build_key -v desc "$dname"
   build_key -v use "$use"
 
-  if [[ -z $use && $CURRENT_HOST && ${HOST_TEMPLATE[$CURRENT_HOST]} ]]; then
-    use="${HOST_TEMPLATE[$CURRENT_HOST]}:$desc"
-  fi
-
   if [[ $1 == --template ]]; then
     shift
     attrs=(
@@ -221,28 +217,28 @@ function host-service() {
       use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
       name="$desc"
     )
-    SERVICES[$desc]=1
+    SERVICES[$desc]="$desc"
   elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
     attrs=(
       register=0
-      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
+      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
       name="$CURRENT_HOST:$desc"
       display_name="$dname"
     )
     HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
-    SERVICES[$CURRENT_HOST:$desc]=1
+    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
   elif [[ $IS_HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
     if [[ ${SERVICES[$CURRENT_HOST:$desc]} == 1 ]]; then
       fatal "duplicate service $dname for host ${HOST_FULLNAME[$CURRENT_HOST]}"
     fi
     attrs=(
-      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
+      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
       service_description="$desc"
       display_name="$dname"
       host_name=$CURRENT_HOST
     )
     HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
-    SERVICES[$CURRENT_HOST:$desc]=1
+    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
   else
     warning "ignore service declaration out of context nor template"
     return 1
