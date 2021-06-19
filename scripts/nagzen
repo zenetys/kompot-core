@@ -139,8 +139,10 @@ function host() {
     host-end
   fi
 
-  build_key -v use "$use"
+  build_key -v use "${use:+_$use}"
   build_key -v hostid "$dname"
+
+  [[ ${1} == --template ]] && hostid="_${hostid}"
 
   CURRENT_HOST="$hostid"
   HOST_TEMPLATE[$CURRENT_HOST]="$use"
