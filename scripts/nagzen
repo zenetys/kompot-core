@@ -155,7 +155,6 @@ function host() {
     attrs=(
       register=0
       name="$hostid"
-      display_name="$dname"
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
     shift
@@ -221,7 +220,6 @@ function host-service() {
       register=0
       use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
       name="$desc"
-      display_name="$dname"
     )
     SERVICES[$desc]=1
   elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
