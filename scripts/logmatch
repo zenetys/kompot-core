@@ -49,7 +49,7 @@ function rewrite(re, a,  new, t) {
 function notify_nagios(entry) {
   printf("[%lu] PROCESS_SERVICE_CHECK_RESULT:%s:%s:%d:%s\n",
          systime(), entry[HOSTNAME], entry[PROGRAM], 
-         entry[NAGIOS_STATE], entry[MSG]) > NAGIOS_EXTERNAL_COMMAND_FILE;
+         entry[NAGIOS_STATE], entry[MSG]) >> NAGIOS_EXTERNAL_COMMAND_FILE;
   close(NAGIOS_EXTERNAL_COMMAND_FILE);
 }
 
@@ -135,6 +135,13 @@ function config( record, i, iattr, value) {
       value = substr($0, index($0, "\x22")+1);
       value = substr(value, 1, index(value, "\x22")-1);
       REWRITES[record,iattr] = value;
+      # debug(sprintf("REWRITES[%d,%d] = %s", record, iattr, value));
+    }
+    else if (substr($1,1,5) == "ATTR:") {
+      iattr = substr($1,6);
+      value = substr($0, index($0, "\x22")+1);
+      value = substr(value, 1, index(value, "\x22")-1);
+      RULEATTRS[record,iattr] = value;
       # debug(sprintf("REWRITES[%d,%d] = %s", record, iattr, value));
     }
     else if ($1 == "RULENAME") {
@@ -248,8 +255,12 @@ function main(line, e, r, ir, a, notify) {
     if (notify == 0) continue;
       
     # compute new attrs
-    e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
     e[RULENAME] = RULENAMES[ir];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"])
+      e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"])
+      e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];  
+    e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
 
     # start actions
     if (DEBUG) {
