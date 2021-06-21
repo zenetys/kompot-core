@@ -191,13 +191,8 @@ function main(line, e, r, ir, a, notify) {
   # local a      : some array
   # local notify : should notify flag
 
-  if (ret < 0) {
-    # timeout
-    cleanup_watchers();
-    return;
-  }
-
   # read record separated by Tabs
+  F = "([^\\t]*)\\t"
   if (!match(line, "^" F F F F F F F "(.*)", e)) {
     rsyslog_ack();
     return;
@@ -214,7 +209,7 @@ function main(line, e, r, ir, a, notify) {
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
       if (!PATTERNS[ir,ia]) continue;
-      debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
+      # debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
       if (match(e[ia], PATTERNS[ir,ia], a)) {
         # pattern found !
         notify = 1;
@@ -228,10 +223,13 @@ function main(line, e, r, ir, a, notify) {
           # dump("rewrite", e); 
         }
       }
+      else {
+        notify = 0;
+        break;
+      }
     }
     
-    if (notify == 0)
-      continue;
+    if (notify == 0) continue;
 
     if (THRESHOLDS_COUNT[ir]) {
       # cleanup watchers before adding new ones
@@ -246,16 +244,18 @@ function main(line, e, r, ir, a, notify) {
       if (WATCHERS_COUNT[e[HOSTNAME],e[PROGRAM]] < THRESHOLDS_COUNT[ir])
         notify = 0;
     }
+
+    if (notify == 0) continue;
       
     # compute new attrs
     e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
     e[RULENAME] = RULENAMES[ir];
 
     # start actions
-    if (notify && DEBUG) {
+    if (DEBUG) {
       dump("notify", e);
     }
-    if (notify && NAGIOS_EXTERNAL_COMMAND_FILE) {
+    if (NAGIOS_EXTERNAL_COMMAND_FILE) {
       notify_nagios(e);
     }
 
@@ -301,15 +301,13 @@ BEGIN {
   delete RULENAMES;  
   delete WATCHERS_TIMEOUT;
   
-  F = "([^\\t]*)\\t"
-
   if (CONFIG) {
     config();
   }
 
   if (DEBUG) {
     for (ir = 1; ir <= length(RULENAMES); ir++) {
-      debug(sprintf("%s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
+      debug(sprintf("CONFIG %s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
                     RULENAMES[ir],PATTERNS[ir,MSG],REWRITES[ir,MSG],FLAGS[ir]));
     }
   }
@@ -323,6 +321,13 @@ BEGIN {
   ##########################################
   # main loop
   while (ret = getline line < "/dev/stdin") {
+
+    if (ret < 0) {
+      # timeout
+      cleanup_watchers();
+      continue;
+    }
+
     main(line);
   }
   exit 0;
