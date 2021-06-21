@@ -36,17 +36,17 @@ function extract_nagios_block() {
   gawk -v HNAME=$2 -v SNAME=$3 -v CNAME=$4 '
   BEGIN {
     if (SNAME) {
-      start_block_pattern = "^servicestatus {$";
-      filter_pattern = "host_name=" HNAME;
-      service_pattern = "service_description=" SNAME;
+      start_block_pattern = "^(servicestatus|define service) {$";
+      filter_pattern = "host_name[=\t]" HNAME "$";
+      service_pattern = "service_description[=\t]" SNAME "$";
     }
     else if (HNAME) {
-      start_block_pattern = "^hoststatus {$";
-      filter_pattern = "host_name=" HNAME;
+      start_block_pattern = "^(hoststatus|define host) {$";
+      filter_pattern = "host_name[=\t]" HNAME "$";
     }
     else if (CNAME) {
       start_block_pattern = "^define command {$";
-      filter_pattern = "command_name\t" CNAME;
+      filter_pattern = "command_name[=\t]" CNAME "$";
     }
   }
   {
@@ -82,12 +82,13 @@ function object_to_cvars() {
   for line in $*; do
     [[ ${line:0:1} != $'\t' ]] && continue
     [[ ${#line} == 2 ]] && continue
-    # line=${line:1}
-    val=${line#*=}
-    var=${line:1:${#line}-${#val}-2}
+    line=${line:1}
+    val=${line#*[=$'\t']}
+    var=${line:0:${#line}-${#val}-1}
     case $var in
       host_name) var="hostname";;
       _*) var="_${type}${var:1}" ; val="${val#0;}" ;;
+      *) var="${type}${var}" ; val="${val#0;}" ;;
     esac
     (( VERBOSE )) && echo ">> ${var^^} = <$val>" >&2
     CVARS[${var^^}]="$val"
@@ -104,6 +105,11 @@ function resource_to_cvars() {
       CVARS[${var:1:${#var}-2}]="$val"
     fi
   done < "$filename"
+}
+
+function fatal() {
+  echo "[FATAL] $*" >&2
+  exit 1
 }
 
 function usage() {
@@ -151,33 +157,29 @@ SNAME=${ARGS[1]}
 
 resource_to_cvars ${RESOURCE}
 
+hostdef="$(extract_nagios_block ${OBJECTDB} "$HNAME")"
+[[ -z $hostdef ]] && fatal "host '$HNAME' not found"
+object_to_cvars HOST "$hostdef"
+
 hostdef="$(extract_nagios_block ${STATUSDB} "$HNAME")"
-
-if [[ -z $hostdef ]]; then
-  echo "host not found" >&2
-  exit 1
-fi
-
+[[ -z $hostdef ]] && fatal "host '$HNAME' not found"
 object_to_cvars HOST "$hostdef"
 
 if [[ $SNAME ]]; then
 
+  servicedef="$(extract_nagios_block ${OBJECTDB} "$HNAME" "$SNAME")"
+  [[ -z $servicedef ]] && fatal "service '$SNAME' on '$HNAME' not found"
+  object_to_cvars SERVICE "$servicedef"
+
   servicedef="$(extract_nagios_block ${STATUSDB} "$HNAME" "$SNAME")"
-  if [[ -z $servicedef ]]; then
-    echo "service not found" >&2
-    exit 1
-  fi
+  [[ -z $servicedef ]] && fatal "service '$SNAME' on '$HNAME' not found"
   object_to_cvars SERVICE "$servicedef"
 
 fi
 
-check_command=$(echo "${servicedef:-$hostdef}" | grep $'^\tcheck_command=')
+check_command=( $(echo "${servicedef:-$hostdef}" | grep $'^\tcheck_command=') )
+[[ ${#check_command[@]} != 1 ]] && fatal "bad or no check_command"
 check_command="${check_command#*=}"
-
-if [[ -z $check_command ]]; then
-  echo "no check_command" >&2
-  exit 1
-fi
 
 commanddef=$(extract_nagios_block ${OBJECTDB} "" "" "$check_command")
 
