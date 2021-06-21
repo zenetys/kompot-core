@@ -203,17 +203,8 @@ function main(line, e, r, ir, a, notify) {
     return;
   }
 
-  if (DEBUG) {
-    for (ir = 1; ir <= length(RULENAMES); ir++) {
-      debug(sprintf("CFG1 %s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
-                    RULENAMES[ir],PATTERNS[ir,MSG],REWRITES[ir,MSG],FLAGS[ir]));
-    }
-  }
-
   # look for known patterns
   for (ir = 1; ir <= length(RULENAMES); ir++) {
-    debug(sprintf("CFG2 %s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
-                   RULENAMES[ir],PATTERNS[ir,MSG],REWRITES[ir,MSG],FLAGS[ir]));
     # by pass disabled rules
     if (DISABLED[ir]) continue;
 
