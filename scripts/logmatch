@@ -47,8 +47,8 @@ function rewrite(re, a,  new, t) {
 }
 
 function notify_nagios(entry) {
-  printf("[%lu] PROCESS_SERVICE_CHECK_RESULT:%s:%s:%d:%s\n",
-         systime(), entry[HOSTNAME], entry[PROGRAM], 
+  printf("[%lu] PROCESS_SERVICE_CHECK_RESULT;%s;%s;%d;%s\n",
+         systime(), entry[HOSTNAME], entry[PROGRAM],
          entry[NAGIOS_STATE], entry[MSG]) >> NAGIOS_EXTERNAL_COMMAND_FILE;
   close(NAGIOS_EXTERNAL_COMMAND_FILE);
 }
@@ -221,7 +221,6 @@ function main(line, e, r, ir, a, notify) {
         # pattern found !
         notify = 1;
         # dump("match", e);
-        # FIXME: match others attributes
         if (REWRITES[ir,ia]) {
           t = substr(e[ia], 1, RSTART-1); # empty if LENGTH nul
           t = t rewrite(REWRITES[ir,ia], a);
@@ -237,6 +236,14 @@ function main(line, e, r, ir, a, notify) {
     }
     
     if (notify == 0) continue;
+
+    # compute new attrs
+    e[RULENAME] = RULENAMES[ir];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"])
+      e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"])
+      e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];
+    e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
 
     if (THRESHOLDS_COUNT[ir]) {
       # cleanup watchers before adding new ones
@@ -254,14 +261,6 @@ function main(line, e, r, ir, a, notify) {
 
     if (notify == 0) continue;
       
-    # compute new attrs
-    e[RULENAME] = RULENAMES[ir];
-    if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"])
-      e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
-    if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"])
-      e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];  
-    e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
-
     # start actions
     if (DEBUG) {
       dump("notify", e);
