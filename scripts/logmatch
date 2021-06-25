@@ -189,8 +189,9 @@ function config( record, i, iattr, value) {
     delete RULENAMES[record];
 }
 
-function main(line, e, r, ir, a, notify) {
+function main(line, ea, e, r, ir, a, notify) {
   # local line   : current line
+  # local ea     : entry array
   # local e      : current entry
   # local t      : temporary string
   # local ir     : record increment
@@ -200,7 +201,7 @@ function main(line, e, r, ir, a, notify) {
 
   # read record separated by Tabs
   F = "([^\\t]*)\\t"
-  if (!match(line, "^" F F F F F F F "(.*)", e)) {
+  if (!match(line, "^" F F F F F F F "(.*)", ea)) {
     rsyslog_ack();
     return;
   }
@@ -215,6 +216,7 @@ function main(line, e, r, ir, a, notify) {
     
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
+      e[ia] = ea[ia];
       if (!PATTERNS[ir,ia]) continue;
       # debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
       if (match(e[ia], PATTERNS[ir,ia], a)) {
