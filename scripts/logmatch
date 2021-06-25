@@ -5,7 +5,9 @@ function fatal(output) {
 }
 
 function debug(output) {
-  printf("[DEBUG] %s\n", output) >"/dev/stderr";
+  if (DEBUG) {
+    printf("[DEBUG] %s\n", output) >"/dev/stderr";
+  }
 }
 
 function dump(id, entry,  i, out) {
@@ -83,6 +85,8 @@ function config( record, i, iattr, value) {
   # value         # current value
 
   record = 1;
+  # initialize record to stop
+  FLAGS[record] = 0x0002;
   while (getline <CONFIG && !ERRNO) {
     line++;
     # bypass coments
@@ -100,6 +104,7 @@ function config( record, i, iattr, value) {
         PATTERNS[record,i] = "";
         REWRITES[record,i] = "";
       }
+      # initialize record to stop
       FLAGS[record] = 0x0002;
       continue;
     }
@@ -206,6 +211,10 @@ function main(line, ea, e, r, ir, a, notify) {
     return;
   }
 
+  if (DEBUG) {
+    dump("parser", ea);
+  }
+
   # look for known patterns
   for (ir = 1; ir <= length(RULENAMES); ir++) {
     # by pass disabled rules
@@ -218,7 +227,8 @@ function main(line, ea, e, r, ir, a, notify) {
     for (ia = 1; ia <= NATTRS; ia++) {
       e[ia] = ea[ia];
       if (!PATTERNS[ir,ia]) continue;
-      # debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
+
+      debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
       if (match(e[ia], PATTERNS[ir,ia], a)) {
         # pattern found !
         notify = 1;
@@ -264,16 +274,18 @@ function main(line, ea, e, r, ir, a, notify) {
     if (notify == 0) continue;
       
     # start actions
-    if (DEBUG) {
-      dump("notify", e);
-    }
+    dump("notify", e);
+
     if (NAGIOS_EXTERNAL_COMMAND_FILE) {
       notify_nagios(e);
     }
 
     # next event
-    if (and(FLAGS[ir],0x0002))
+    if (and(FLAGS[ir],0x0002)) {
+      debug("Rule => stop");
       break;
+    }
+    debug("Rule => continue");
   }
 
   rsyslog_ack();
@@ -317,11 +329,9 @@ BEGIN {
     config();
   }
 
-  if (DEBUG) {
-    for (ir = 1; ir <= length(RULENAMES); ir++) {
-      debug(sprintf("CONFIG %s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
-                    RULENAMES[ir],PATTERNS[ir,MSG],REWRITES[ir,MSG],FLAGS[ir]));
-    }
+  for (ir = 1; ir <= length(RULENAMES); ir++) {
+    debug(sprintf("CONFIG %s: pattern[msg]=<%s> rewrite[msg]=<%s> flag=0x%04x",
+                  RULENAMES[ir],PATTERNS[ir,MSG],REWRITES[ir,MSG],FLAGS[ir]));
   }
   # PATTERNS[1,MSG] = "(..)t";
   # REWRITES[1,MSG] = "\\1toto-\\1-toto";
@@ -333,6 +343,7 @@ BEGIN {
   ##########################################
   # main loop
   while (ret = getline line < "/dev/stdin") {
+    debug(sprintf("read: line=<%s> ret=%d", line, ret));
 
     if (ret < 0) {
       # timeout
