@@ -44,7 +44,10 @@ function warning() {
 }
 
 function debug() {
-    (( DEBUG == 0 )) && return 0
+    local debug=0
+
+    [[ ${1:0:1} == - ]] && debug=${1:1} && shift
+    (( DEBUG < $debug )) && return 0
     info --${FUNCNAME[0]} "$@"
 }
 
@@ -130,7 +133,7 @@ function addHost() {
 }
 
 function host() {
-  debug "$FUNCNAME $*"
+  debug -5 "$FUNCNAME $*"
   local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
@@ -202,7 +205,7 @@ function host-end() {
 }
 
 function host-service() {
-  debug "$FUNCNAME $*"
+  debug -5 "$FUNCNAME $*"
   local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
