@@ -213,6 +213,13 @@ function host-service() {
   build_key -v desc "$dname"
   build_key -v use "$use"
 
+  if [[ ${1:0:7} == "--host=" ]]; then
+    local CURRENT_HOST
+    local HOST_IS_TEMPLATE=0
+    build_key -v CURRENT_HOST "${1:7}"
+    shift
+  fi
+
   if [[ $1 == --template ]]; then
     shift
     attrs=(
