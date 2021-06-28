@@ -215,7 +215,7 @@ function host-service() {
 
   if [[ ${1:0:7} == "--host=" ]]; then
     local CURRENT_HOST
-    local HOST_IS_TEMPLATE=0
+    local IS_HOST_TEMPLATE=0
     build_key -v CURRENT_HOST "${1:7}"
     shift
   fi
