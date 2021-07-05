@@ -35,11 +35,13 @@ function do_reset_state() {
   if [[ $svc == _host_ ]]; then
     nagios_extcmd "DEL_ALL_HOST_COMMENTS;$host"
     nagios_extcmd "REMOVE_HOST_ACKNOWLEDGEMENT;$host"
-    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;__TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;__CLEAR_CACHE;1"
   else
     nagios_extcmd "DEL_ALL_SVC_COMMENTS;$host;$svc"
     nagios_extcmd "REMOVE_SVC_ACKNOWLEDGEMENT;$host;$svc"
-    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;__TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;__CLEAR_CACHE;1"
   fi
 }
 
@@ -53,9 +55,9 @@ function do_comment() {
 
 function do_track() {
   if [[ $svc == _host_ ]]; then
-    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;$AUTHOR:$COMMENT"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;__TRACK;$AUTHOR:$COMMENT"
   else
-    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;$AUTHOR:$COMMENT"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;__TRACK;$AUTHOR:$COMMENT"
   fi
 }
 
