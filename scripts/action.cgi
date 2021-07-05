@@ -55,11 +55,11 @@ function do_reset_state() {
   if [[ $svc == _host_ ]]; then
     nagios_extcmd "DEL_ALL_HOST_COMMENTS;$host"
     nagios_extcmd "REMOVE_HOST_ACKNOWLEDGEMENT;$host"
-    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;"
   else
     nagios_extcmd "DEL_ALL_SVC_COMMENTS;$host;$svc"
     nagios_extcmd "REMOVE_SVC_ACKNOWLEDGEMENT;$host;$svc"
-    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;TRACK;"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;"
   fi
 }
 
@@ -83,9 +83,9 @@ function do_track() {
   local comment="$3"
 
   if [[ $svc == _host_ ]]; then
-    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;TRACK;$author:$comment"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;$author:$comment"
   else
-    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;TRACK;$author:$comment"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;$author:$comment"
   fi
 }
 
