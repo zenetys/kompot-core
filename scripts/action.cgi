@@ -7,7 +7,7 @@ function nagios_extcmd() {
 }
 
 function do_alarm_off() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "DISABLE_HOST_NOTIFICATIONS;$host"
   else
     nagios_extcmd "DISABLE_SVC_NOTIFICATIONS;$host;$svc"
@@ -15,7 +15,7 @@ function do_alarm_off() {
 }
 
 function do_ack() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "ACKNOWLEDGE_HOST_PROBLEM;$host;2;1;1;$AUTHOR;$COMMENT"
   else
     nagios_extcmd "ACKNOWLEDGE_SVC_PROBLEM;$host;$svc;2;1;1;$AUTHOR;$COMMENT"
@@ -23,7 +23,7 @@ function do_ack() {
 }
 
 function do_recharge() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "SCHEDULE_FORCED_HOST_SVC_CHECKS;$host;$NOW"
     nagios_extcmd "SCHEDULE_FORCED_HOST_CHECK;$host;$NOW"
   else
@@ -32,7 +32,7 @@ function do_recharge() {
 }
 
 function do_reset_state() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "DEL_ALL_HOST_COMMENTS;$host"
     nagios_extcmd "REMOVE_HOST_ACKNOWLEDGEMENT;$host"
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;0"
@@ -46,7 +46,7 @@ function do_reset_state() {
 }
 
 function do_comment() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "ADD_HOST_COMMENT;$host;1;$AUTHOR;$COMMENT"
   else
     nagios_extcmd "ADD_SVC_COMMENT;$host;$svc;1;$AUTHOR;$COMMENT"
@@ -54,7 +54,7 @@ function do_comment() {
 }
 
 function do_track() {
-  if [[ $svc == _host_ ]]; then
+  if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;$AUTHOR:$COMMENT"
   else
     nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;$AUTHOR:$COMMENT"
