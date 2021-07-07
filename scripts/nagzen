@@ -217,10 +217,8 @@ function host-service() {
     shift
   fi
 
-  build_key -v desc "$dname"
+  build_key -v desc "${dname,,}"
   build_key -v use "${use,,}"
-
-  [[ ${1} == --template || $IS_HOST_TEMPLATE ]] && desc="${desc,,}"
 
   if [[ $1 == --template ]]; then
     shift
@@ -245,7 +243,7 @@ function host-service() {
     fi
     attrs=(
       use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
-      service_description="$desc"
+      service_description="${dname//[^A-Za-z0-9:_-]/_}"
       display_name="$dname"
       host_name=$CURRENT_HOST
     )
