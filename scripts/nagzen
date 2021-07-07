@@ -142,10 +142,10 @@ function host() {
     host-end
   fi
 
-  build_key -v use "${use:+_$use}"
+  build_key -v use "${use:+_${use,,}}"
   build_key -v hostid "$dname"
 
-  [[ ${1} == --template ]] && hostid="_${hostid}"
+  [[ ${1} == --template ]] && hostid="_${hostid,,}"
 
   CURRENT_HOST="$hostid"
   HOST_TEMPLATE[$CURRENT_HOST]="$use"
@@ -210,15 +210,17 @@ function host-service() {
   local dname=${1%%:*}; shift
   local attrs=( )
 
-  build_key -v desc "$dname"
-  build_key -v use "$use"
-
   if [[ ${1:0:7} == "--host=" ]]; then
     local CURRENT_HOST
     local IS_HOST_TEMPLATE=0
     build_key -v CURRENT_HOST "${1:7}"
     shift
   fi
+
+  build_key -v desc "$dname"
+  build_key -v use "${use,,}"
+
+  [[ ${1} == --template || $IS_HOST_TEMPLATE ]] && desc="${desc,,}"
 
   if [[ $1 == --template ]]; then
     shift
