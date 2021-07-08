@@ -119,7 +119,7 @@ function dump_nagios_object() {
     fi
   done
   for attr in "${already[@]}"; do
-    warning "'$attr' for $type '$name' multiple definition, keep first"
+    debug "'$attr' for $type '$name' multiple definition, keep first"
   done
   if [[ $use ]]; then
     printf "  %-20s %s\n" "use" "$use"
