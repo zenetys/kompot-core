@@ -89,8 +89,8 @@ function object_to_cvars() {
       host_name) var="hostname";;
       display_name) [[ $TYPE == HOST ]] && var="hostdisplayname" || var="servicedisplayname";;
       service_description) var="servicedesc";;
-      _*) var="_${type}${var:1}" ; val="${val#0;}" ;;
-      *) var="${type}${var}" ; val="${val#0;}" ;;
+      _*) var="_${type}${var:1}" ; val="${val#*;}" ;;
+      *) var="${type}${var}" ; val="${val#*;}" ;;
     esac
     (( VERBOSE )) && echo ">> ${var^^} = <$val>" >&2
     CVARS[${var^^}]="$val"
