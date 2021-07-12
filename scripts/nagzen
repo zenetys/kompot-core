@@ -97,6 +97,7 @@ function dump_nagios_object() {
   local type=$1; shift
   local attr value use name
   local -A defined=()
+  local -A already=()
 
   echo "define $type {"
   for field in "$@"; do
