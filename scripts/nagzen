@@ -97,7 +97,7 @@ function dump_nagios_object() {
   local type=$1; shift
   local attr value use name
   local -A defined=()
-  local -A already=()
+  local -a already=()
 
   echo "define $type {"
   for field in "$@"; do
@@ -120,7 +120,7 @@ function dump_nagios_object() {
     fi
   done
   for attr in "${already[@]}"; do
-    debug "'$attr' for $type '$name' multiple definition, keep first"
+    debug -2 "'$attr' for $type '$name' multiple definition, keep first"
   done
   if [[ $use ]]; then
     printf "  %-20s %s\n" "use" "$use"
