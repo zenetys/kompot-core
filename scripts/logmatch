@@ -89,6 +89,8 @@ function config( record, i, iattr, value) {
   FLAGS[record] = 0x0002;
   while (getline <CONFIG && !ERRNO) {
     line++;
+    # convert UTF8 Right Single Quotation Mark & Left Single Quotation Mark
+    $0 = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", $0);
     # bypass coments
     if (substr($0, 1, 1) == "#")
       continue;
@@ -355,6 +357,8 @@ BEGIN {
       cleanup_watchers();
       continue;
     }
+
+    line = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", line);
 
     main(line);
   }
