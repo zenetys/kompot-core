@@ -228,7 +228,7 @@ function main(line, ea, e, r, ir, a, notify) {
       e[ia] = ea[ia];
       if (!PATTERNS[ir,ia]) continue;
 
-      debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
+      # debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
       if (match(e[ia], PATTERNS[ir,ia], a)) {
         # pattern found !
         notify = 1;
@@ -248,6 +248,9 @@ function main(line, ea, e, r, ir, a, notify) {
     }
     
     if (notify == 0) continue;
+
+    # dump("match", ea);
+    # dump("rewrite", e);
 
     # compute new attrs
     e[RULENAME] = RULENAMES[ir];
