@@ -200,7 +200,6 @@ function main(line, ea, e, r, ir, a, notify) {
   # local line   : current line
   # local ea     : entry array
   # local e      : current entry
-  # local t      : temporary string
   # local ir     : record increment
   # local ia     : attribut increment
   # local a      : some array
@@ -238,10 +237,7 @@ function main(line, ea, e, r, ir, a, notify) {
         if (DEBUG >= 5)
           dump("attr-match", e);
         if (REWRITES[ir,ia]) {
-          t = substr(e[ia], 1, RSTART-1); # empty if LENGTH nul
-          t = t rewrite(REWRITES[ir,ia], a);
-          t = t substr(e[ia], RSTART + RLENGTH); # empty if START after end
-          e[ia] = t;
+          e[ia] = rewrite(REWRITES[ir,ia], a);
           # dump("rewrite", e); 
         }
       }
