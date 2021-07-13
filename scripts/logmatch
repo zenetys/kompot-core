@@ -304,7 +304,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
       if (DEBUG >= 2) debug("Rule => stop");
       break;
     }
-    if (DEBUG => 2) debug("Rule => continue");
+    if (DEBUG >= 2) debug("Rule => continue");
   }
 
   rsyslog_ack();
