@@ -214,9 +214,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     return;
   }
 
-  if (DEBUG) {
-    dump("parser", ea);
-  }
+  if (DEBUG >= 2) dump("parser", ea);
 
   # look for known patterns
   for (ir = 1; ir <= length(RULENAMES); ir++) {
@@ -232,14 +230,12 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
       e[ia] = ea[ia];
       if (!PATTERNS[ir,ia]) continue;
 
-      if (DEBUG >= 5)
-        debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
+      if (DEBUG >= 5) debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
 
       if (match(e[ia], PATTERNS[ir,ia], a)) {
         # pattern found !
         notify = 1;
-        if (DEBUG >= 5)
-          dump("attr-match", e);
+        if (DEBUG >= 5) dump("attr-match", e);
 
         # backup all matches
         for (i = 1; a[i, "start"]; i++) {
@@ -259,7 +255,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     
     if (notify == 0) continue;
 
-    if (DEBUG >= 2) dump("match", ea);
+    if (DEBUG >= 1) dump("match", ea);
     if (DEBUG >= 2) dump("rewrite", e);
 
     # compute new attrs
@@ -362,7 +358,7 @@ BEGIN {
   ##########################################
   # main loop
   while (ret = getline line < "/dev/stdin") {
-    if (debug >=2) debug(sprintf("read: line=<%s> ret=%d", line, ret));
+    if (DEBUG >=2) debug(sprintf("read: line=<%s> ret=%d", line, ret));
 
     if (ret < 0) {
       # timeout
