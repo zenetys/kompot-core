@@ -102,7 +102,7 @@ function config( record, i, iattr, value) {
         record++;
       }
       # initialize (or re-initialize)
-      for (i = 1; i <= 8; i++) {
+      for (i = 1; i <= NATTRS; i++) {
         PATTERNS[record,i] = "";
         REWRITES[record,i] = "";
       }
@@ -196,14 +196,16 @@ function config( record, i, iattr, value) {
     delete RULENAMES[record];
 }
 
-function main(line, ea, e, r, ir, a, notify) {
-  # local line   : current line
-  # local ea     : entry array
-  # local e      : current entry
-  # local ir     : record increment
-  # local ia     : attribut increment
-  # local a      : some array
-  # local notify : should notify flag
+function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
+  # local line    : current line
+  # local ea      : entry array
+  # local e       : current entry
+  # local ir      : record increment
+  # local ia      : attribut increment
+  # local i       : local increment
+  # local a       : some array
+  # local matches : keep matches
+  # local notify  : should notify flag
 
   # read record separated by Tabs
   F = "([^\\t]*)\\t"
@@ -223,6 +225,7 @@ function main(line, ea, e, r, ir, a, notify) {
 
     # need notification ?
     notify = 0;
+    delete matches;
     
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
@@ -231,11 +234,18 @@ function main(line, ea, e, r, ir, a, notify) {
 
       if (DEBUG >= 5)
         debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
+
       if (match(e[ia], PATTERNS[ir,ia], a)) {
         # pattern found !
         notify = 1;
         if (DEBUG >= 5)
           dump("attr-match", e);
+
+        # backup all matches
+        for (i = 1; a[i, "start"]; i++) {
+          matches[length(matches)+1] = a[i];
+        }
+
         if (REWRITES[ir,ia]) {
           e[ia] = rewrite(REWRITES[ir,ia], a);
           # dump("rewrite", e); 
@@ -254,8 +264,14 @@ function main(line, ea, e, r, ir, a, notify) {
 
     # compute new attrs
     e[RULENAME] = RULENAMES[ir];
-    if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"])
-      e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"]) {
+      if (substr(RULEATTRS[ir,"NAGIOS_FORCED_HOST"], 1, 1) == "\\") {
+        e[HOSTNAME] = rewrite(RULEATTRS[ir,"NAGIOS_FORCED_HOST"], matches);
+      }
+      else {
+        e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
+      }
+    }
     if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"])
       e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];
     e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
@@ -277,7 +293,7 @@ function main(line, ea, e, r, ir, a, notify) {
     if (notify == 0) continue;
       
     # start actions
-    dump("notify", e);
+    if (DEBUG >= 2) dump("notify", e);
 
     if (NAGIOS_EXTERNAL_COMMAND_FILE) {
       notify_nagios(e);
@@ -285,10 +301,10 @@ function main(line, ea, e, r, ir, a, notify) {
 
     # next event
     if (and(FLAGS[ir],0x0002)) {
-      debug("Rule => stop");
+      if (DEBUG >= 2) debug("Rule => stop");
       break;
     }
-    debug("Rule => continue");
+    if (DEBUG => 2) debug("Rule => continue");
   }
 
   rsyslog_ack();
@@ -346,7 +362,7 @@ BEGIN {
   ##########################################
   # main loop
   while (ret = getline line < "/dev/stdin") {
-    debug(sprintf("read: line=<%s> ret=%d", line, ret));
+    if (debug >=2) debug(sprintf("read: line=<%s> ret=%d", line, ret));
 
     if (ret < 0) {
       # timeout
