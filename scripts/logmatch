@@ -224,6 +224,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     # need notification ?
     notify = 0;
     delete matches;
+    delete e;
     
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
