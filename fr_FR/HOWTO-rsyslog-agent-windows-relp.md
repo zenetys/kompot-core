@@ -18,7 +18,7 @@
 4. Dans le menu "Send RELP"
 ![RSYSLOG Adiscon RELP](./rsyslog-3.png)
   1. Saisissez le nom du serveur dans le champs "RELP Servername"
-  2. Saisissez le format suivant dans "Message Format" : `%sourceproc%.%catname%: %syslogpriority_text%: date=%timereported:1:10%T%timereported:12:19% source=%source% msgid=%id% user=%user% msg=%msg:::spacecc,compressspace%%$CRLF%`
+  2. Saisissez le format suivant dans "Message Format" : `%sourceraw%/%channel%: id=%id%,date="%timegenerated:::localtime%",msg="%msg:::spacecc,compressspace%"`
   3. Saisissez les informations TLS dans le zone "Enable SSL/TLS Encryption" une fois l'option cochée:
      1. Définir "TLS Mode" à "Use Certificate"
      2. Choisir le fichier PEM de l'authorité de certification dans "Select common CA PEM"
