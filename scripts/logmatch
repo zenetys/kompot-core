@@ -24,11 +24,12 @@ function isdigit(s) {
   return 0;
 }
 
-function rewrite(re, a,  new, t) {
-  # arg re  : rewrite rule
-  # arg a   : array of string to use (return of match())
+function rewrite(re, a, new, t, alias) {
+  # arg re      : rewrite rule
+  # arg a       : array of string to use (return of match())
   # local new   : new string
   # local t     : temporary index
+  # local alias : temporary alias
   
   new = "";
   while(length(re) > 1) {
@@ -38,6 +39,16 @@ function rewrite(re, a,  new, t) {
     if (isdigit(s)) {
       new = new a[strtonum(s)];
       re = substr(re, t + 2);
+    }
+    else if (s == "[" && substr(re, t+3, 1) == "]") {
+      s = substr(re, t+2, 1);
+      if (length(ALIAS) > 0 && ALIAS[a[strtonum(s)]]) {
+        new = new ALIAS[a[strtonum(s)]];
+      }
+      else {
+        new = new a[strtonum(s)];
+      }
+      re = substr(re, t + 4);
     }
     else {
       new = new "\\" s;
@@ -56,7 +67,6 @@ function notify_nagios(entry) {
 }
 
 function rsyslog_ack() {
-  print "OK";
   fflush();
 }
 
@@ -68,7 +78,7 @@ function cleanup_watchers() {
   if (length(WATCHERS_TIMEOUT)) {
     now = systime();
     for (k in WATCHERS_TIMEOUT) {
-      debug(sprintf("%s: %d < now: %d", k, WATCHERS_TIMEOUT[k], WATCHERS_TIMEOUT[k] < now));
+      debug(sprintf("watch(%s): %d < now: %d", k, WATCHERS_TIMEOUT[k], WATCHERS_TIMEOUT[k] < now));
       if (WATCHERS_TIMEOUT[k] < now) {
         # timeout pass, cleanup
         delete WATCHERS_COUNT[k];
@@ -78,11 +88,30 @@ function cleanup_watchers() {
   }
 }
 
-function config( record, i, iattr, value) {
+function aliases(line) {
+  while (getline <ALIASES && !ERRNO) {
+    line++;
+
+    # bypass coments
+    if (substr($0, 1, 1) == "#")
+      continue;
+
+    # store each alias
+    for (i = 1; $i; i++) {
+      ALIAS[$i] = $1;
+      debug(sprintf("ALIAS[%s] = %s", $i, $1));
+    }
+  }
+
+
+}
+
+function config( record, i, iattr, value, line) {
   # local record  # current record
   # local i       # increment
   # local iattr   # attribut increment
-  # value         # current value
+  # local value   # current value
+  # local line    # line number
 
   record = 1;
   # initialize record to stop
@@ -256,7 +285,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     
     if (notify == 0) continue;
 
-    if (DEBUG >= 1) dump("match", ea);
+    if (DEBUG >= 2) dump("match", ea);
     if (DEBUG >= 2) dump("rewrite", e);
 
     # compute new attrs
@@ -290,7 +319,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     if (notify == 0) continue;
       
     # start actions
-    if (DEBUG >= 2) dump("notify", e);
+    if (DEBUG >= 1) dump("notify", e);
 
     if (NAGIOS_EXTERNAL_COMMAND_FILE) {
       notify_nagios(e);
@@ -340,9 +369,14 @@ BEGIN {
   # initialize potentialy empty array
   delete RULENAMES;  
   delete WATCHERS_TIMEOUT;
+  delete ALIAS;
   
   if (CONFIG) {
     config();
+  }
+
+  if (ALIASES) {
+    aliases();
   }
 
   for (ir = 1; ir <= length(RULENAMES); ir++) {
