@@ -139,6 +139,8 @@ while (( $# > 0 )) ; do
     --x-debug) XDEBUG=1 ;;
     ## -v, --verbose: verbose mode
     -v|--verbose) VERBOSE=1 ;;
+    ## --exec: execute command
+    --exec) EXEC=1 ;;
     ## ignore others arguments
     --) break ;;
     ## store unknown args
@@ -207,10 +209,11 @@ for var in "${!CVARS[@]}"; do
   exec_line="${exec_line//\$${var}\$/${CVARS[$var]}}"
 done
 
-echo "$check_command"
-echo "$command_line"
-echo "$exec_line"
-
-
-
+if [[ $EXEC == 1 ]]; then
+  eval "$exec_line"
+else
+  echo "$check_command"
+  echo "$command_line"
+  echo "$exec_line"
+fi
 
