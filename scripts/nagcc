@@ -154,6 +154,7 @@ trap onError ERR
 
 HNAME=${ARGS[0]}
 SNAME=${ARGS[1]}
+CNAME=${ARGS[2]}
 
 [[ $HNAME ]] || { usage && exit 1 ; }
 
@@ -180,9 +181,13 @@ if [[ $SNAME ]]; then
 
 fi
 
-check_command=( $(echo "${servicedef:-$hostdef}" | grep $'^\tcheck_command=') )
-[[ ${#check_command[@]} != 1 ]] && fatal "bad or no check_command"
-check_command="${check_command#*=}"
+if [[ $CNAME == "" ]]; then
+  check_command=( $(echo "${servicedef:-$hostdef}" | grep $'^\tcheck_command=') )
+  [[ ${#check_command[@]} != 1 ]] && fatal "bad or no check_command"
+  check_command="${check_command#*=}"
+else
+  check_command="$CNAME"
+fi
 
 commanddef=$(extract_nagios_block ${OBJECTDB} "" "" "$check_command")
 
@@ -190,6 +195,11 @@ command_line=$(echo "$commanddef" | grep $'^\tcommand_line\t')
 command_line="${command_line#*command_line$'\t'}"
 
 exec_line=${command_line}
+
+# load command line vars
+for var in "${ARGS[@]:3}"; do
+  CVARS[${var%%=*}]="${var#*=}"
+done
 
 # replace vars
 for var in "${!CVARS[@]}"; do
