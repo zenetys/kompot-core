@@ -67,6 +67,7 @@ function notify_nagios(entry) {
 }
 
 function rsyslog_ack() {
+  printf("OK\n");
   fflush();
 }
 
