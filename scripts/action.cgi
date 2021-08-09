@@ -90,7 +90,7 @@ IFS=";"
 while read host svc rest; do
   echo "DO_ACTION '$DO_ACTION' '$host' '$svc' '$AUTHOR' '$COMMENT'" >&2
   $DO_ACTION
-done < <(jq -r '.data[]|(.name+";"+.display_name)' < $_TEMP_CONTENT_DATA)
+done < <(jq -r '.data[]|(.name+";"+.description)' < $_TEMP_CONTENT_DATA)
 
 printf '{"status": "ok", "action": "%s"}' "$ACTION"
 
