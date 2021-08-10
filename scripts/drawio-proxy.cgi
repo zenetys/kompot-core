@@ -6,7 +6,7 @@ function header() {
   printf "%s\r\n" "$*"
 }
 
-DATADIR="/etc/nag4you/diagrams"
+DATADIR="${DRAWIO_DATADIR:-/var/www/html}"
 
 # get query string parameters
 declare ${QUERY_STRING//&/$IFS}
