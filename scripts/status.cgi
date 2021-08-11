@@ -30,28 +30,51 @@
 #
 
 BEGIN {
+  NAGIOS_STATUS_FILE = ENVIRON["NAGIOS_STATUS_FILE"];
+
+  L5 = " "( L4 = " "( L3 = " "( L2 = " "(L1 = " "))));
+
   HOSTSTATUS = "hoststatus";
+  SERVICESTATUS = "servicestatus";
   
-  REGISTER["host_name"] = 1;
-  REGISTER["service_description"] = 1;
-  REGISTER["__AUTOTRACK"] = 1;
-  REGISTER["status"] = 1;
+  REGISTER_S["host_name"] = 1;
+  REGISTER_S["service_description"] = 1;
+  REGISTER_S["plugin_output"] = 1;
+  REGISTER_I["current_state"] = 1;
+  REGISTER_I["last_check"] = 1;
+  REGISTER_I["current_attempt"] = 1;
+  REGISTER_I["state_type"] = 1;
+  REGISTER_I["last_state_change"] = 1;
+  REGISTER_I["last_hard_state_change"] = 1;
+  REGISTER_I["last_update"] = 1;
+  REGISTER_I["notifications_enabled"] = 1;
+  REGISTER_I["problem_has_been_acknowledged"] = 1;
+  REGISTER_I["active_checks_enabled"] = 1;
+  REGISTER_I["passive_checks_enabled"] = 1;
+  REGISTER_I["is_flapping"] = 1;
+  REGISTER_S["__TRACK"] = 1;
+  REGISTER_S["__AUTOTRACK"] = 1;
   
   printf("{\n");
-  printf(" \"data\": {\n");
-  printf("  \"servicelist\": {\n");
+  printf("%s\"data\": {\n", L1);
+  printf("%s\"servicelist\": {\n", L2);
 
-  while (getline line < NAGIOS_STATUS_FILE)) {
+  while (getline line < NAGIOS_STATUS_FILE) {
+    # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
     if (match(line, "^([a-z]+) {", a)) {
       block = 1;
       section = a[1];
+      # printf("[DEBUG] start block(%s)\n", section);
     }
-    else if (match(line, "^}")) {
+    else if (match(line, "^\t}$")) {
+      if (section == SERVICESTATUS) printf("\n%s}",L4);
+      # printf("[DEBUG] end block(%s)\n", section);
       block = 0;
+      section = "";
     }
-    else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a) {
+    else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a)) {
       # pass unwanted attributes
-      if (!REGISTER[a[1]]) next;
+      if (!REGISTER_S[a[1]] && !REGISTER_I[a[1]]) continue;
       
       if (section == HOSTSTATUS && a[1] == "host_name") {
         host_name = a[2];
@@ -62,24 +85,46 @@ BEGIN {
         host_attrs[host_name, a[1]] = a[2];
       }
       else if (section == SERVICESTATUS && a[1] == "host_name") {
-        host_name = a[2];
         # section change
         if (a[2] != host_name) {
-          if (host_name) printf("   }\n");
+          if (host_name) printf("%s},\n", L3);
           host_name = a[2];
-          printf("   \"%s\": {");
+          printf("%s\"%s\": {\n", L3, host_name);
+          printf("%s\"%s\": {\n", L4, "_HOST_");
+          host_attrs[host_name, "display_name"] = "_HOST_";
+          printf("%s\"%s\": \"%s\"", L5, "service_description", "_HOST_");
+          for (attr in REGISTER_S) {
+            if (!host_attrs[host_name, attr]) continue;
+            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+          }
+          for (attr in REGISTER_I) {
+            if (!host_attrs[host_name, attr]) continue;
+            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+          }
+          printf("\n%s},\n", L4);
+        }
+        else {
+          printf(",\n");
         }
       }
       else if (section == SERVICESTATUS && a[1] == "service_description") {
-        service_name = a[2];
-        service_attrs[host_name, service_name, "host_name"] = host_name;
-        service_attrs[host_name, service_name, a[1]] = a[2];
+        printf("%s\"%s\": {\n", L4, a[2]);
+        printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
+        printf("%s\"%s\": \"%s\"", L5, a[1], a[2]);
       }
       else if (section == SERVICESTATUS) {
-        service_attrs[host_name, service_name, a[1]] = a[2];
+        if (REGISTER_S[a[1]])
+          printf(",\n%s\"%s\": \"%s\"", L5, a[1],
+                 gensub("[\\\\\"]", "\\\\\\0", "g", a[2]));
+        else
+          printf(",\n%s\"%s\": %s", L5, a[1], a[2]);
       }
     }
   }
+  
+  printf("%s}\n", L2);
+  printf("%s}\n", L1);
+  printf("}\n");
   exit 0;
 }
 
