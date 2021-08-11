@@ -88,6 +88,7 @@ declare -f  >/dev/null ||
 
 IFS=";"
 while read host svc rest; do
+  [[ -z $svc ]] && svc="_HOST_"
   echo "DO_ACTION '$DO_ACTION' '$host' '$svc' '$AUTHOR' '$COMMENT'" >&2
   $DO_ACTION
 done < <(jq -r '.data[]|(.name+";"+.description)' < $_TEMP_CONTENT_DATA)
