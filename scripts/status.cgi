@@ -31,6 +31,15 @@
 
 BEGIN {
   HOSTSTATUS = "hoststatus";
+  
+  REGISTER["host_name"] = 1;
+  REGISTER["service_description"] = 1;
+  REGISTER["__AUTOTRACK"] = 1;
+  REGISTER["status"] = 1;
+  
+  printf("{\n");
+  printf(" \"data\": {\n");
+  printf("  \"servicelist\": {\n");
 
   while (getline line < NAGIOS_STATUS_FILE)) {
     if (match(line, "^([a-z]+) {", a)) {
@@ -54,6 +63,12 @@ BEGIN {
       }
       else if (section == SERVICESTATUS && a[1] == "host_name") {
         host_name = a[2];
+        # section change
+        if (a[2] != host_name) {
+          if (host_name) printf("   }\n");
+          host_name = a[2];
+          printf("   \"%s\": {");
+        }
       }
       else if (section == SERVICESTATUS && a[1] == "service_description") {
         service_name = a[2];
