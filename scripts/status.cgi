@@ -121,17 +121,19 @@ function servicelist() {
           if (host_name) printf("\n%s},\n", L3);
           host_name = val;
           printf("%s\"%s\": {\n", L3, host_name);
-          printf("%s\"%s\": {\n", L4, "_HOST_");
-          printf("%s\"%s\": \"%s\"", L5, "description", "_HOST_");
-          for (attr in REGISTER_S) {
-            if (!((host_name,attr) in host_attrs)) continue;
-            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+          if (0) {
+            printf("%s\"%s\": {\n", L4, "_HOST_");
+            printf("%s\"%s\": \"%s\"", L5, "description", "_HOST_");
+            for (attr in REGISTER_S) {
+              if (!((host_name,attr) in host_attrs)) continue;
+              printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+            }
+            for (attr in REGISTER_I) {
+              if (!((host_name, attr) in host_attrs)) continue;
+              printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
+            }
+            printf("\n%s},\n", L4);
           }
-          for (attr in REGISTER_I) {
-            if (!((host_name, attr) in host_attrs)) continue;
-            printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
-          }
-          printf("\n%s},\n", L4);
         }
         else {
           printf(",\n");
