@@ -29,6 +29,82 @@
 ##
 #
 
+
+function main() {
+  while (getline line < NAGIOS_STATUS_FILE) {
+    # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
+    if (match(line, "^([a-z]+) {", a)) {
+      block = 1;
+      if (section == SERVICESTATUS && section != a[1])
+        printf("\n%s}\n",L3);
+      section = a[1];
+      # printf("[DEBUG] start block(%s)\n", section);
+    }
+    else if (match(line, "^\t}$")) {
+      if (section == HOSTSTATUS)
+        host_name = "";
+      if (section == SERVICESTATUS && host_name)
+        printf("\n%s}",L4);
+      # printf("[DEBUG] end block(%s)\n", section);
+      block = 0;
+    }
+    else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a)) {
+      # pass unwanted attributes
+      if (!(a[1] in REGISTER_S) && !(a[1] in REGISTER_I)) continue;
+      
+      if (section == HOSTSTATUS && a[1] == "host_name") {
+        if (filter && filter != a[2]) continue;
+        host_name = a[2];
+        host_list[host_name] = 1;
+        host_attrs[host_name, a[1]] = a[2];
+      }
+      else if (section == HOSTSTATUS) {
+        host_attrs[host_name, a[1]] = a[2];
+      }
+      else if (section == SERVICESTATUS && a[1] == "host_name") {
+
+        # section change
+        if (a[2] != host_name) {
+          if (filter && filter != a[2]) {
+             host_name = "";
+             continue;
+          }
+          if (host_name) printf("%s},\n", L3);
+          host_name = a[2];
+          printf("%s\"%s\": {\n", L3, host_name);
+          printf("%s\"%s\": {\n", L4, "_HOST_");
+          host_attrs[host_name, "display_name"] = "_HOST_";
+          printf("%s\"%s\": \"%s\"", L5, "service_description", "_HOST_");
+          for (attr in REGISTER_S) {
+            if (!((host_name,attr) in host_attrs)) continue;
+            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+          }
+          for (attr in REGISTER_I) {
+            if (!((host_name, attr) in host_attrs)) continue;
+            printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
+          }
+          printf("\n%s},\n", L4);
+        }
+        else {
+          printf(",\n");
+        }
+      }
+      else if (section == SERVICESTATUS && host_name && a[1] == "service_description") {
+        printf("%s\"%s\": {\n", L4, a[2]);
+        printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
+        printf("%s\"%s\": \"%s\"", L5, a[1], a[2]);
+      }
+      else if (section == SERVICESTATUS && host_name) {
+        if (a[1] in REGISTER_S)
+          printf(",\n%s\"%s\": \"%s\"", L5, a[1],
+                 gensub("[\\\\\"]", "\\\\\\0", "g", a[2]));
+        else
+          printf(",\n%s\"%s\": %s", L5, a[1], a[2]);
+      }
+    }
+  }
+}
+
 BEGIN {
   NAGIOS_STATUS_FILE = ENVIRON["NAGIOS_STATUS_FILE"];
   QUERY_STRING = ENVIRON["QUERY_STRING"];
@@ -56,86 +132,32 @@ BEGIN {
   REGISTER_S["__TRACK"] = 1;
   REGISTER_S["__AUTOTRACK"] = 1;
   
-  split(QUERY_STRING, a);
-  for (attr in a) {
-    if (substr(a, 1, 9) == "hostname=") {
-      filter = substr(a, 10);
-      break;
+  split(QUERY_STRING, a, "&");
+  for (ia in a) {
+    # printf("DEBUG QS(%s)\n", a[ia]) > "/dev/stderr";
+    if (substr(a[ia], 1, 9) == "hostname=") {
+      filter = substr(a[ia], 10);
+    }
+    else if (substr(a[ia], 1, 6) == "query=") {
+      query = substr(a[ia], 7);
     }
   }
+  # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
   
   printf("{\n");
   printf("%s\"data\": {\n", L1);
-  printf("%s\"servicelist\": {\n", L2);
 
-  while (getline line < NAGIOS_STATUS_FILE) {
-    # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
-    if (match(line, "^([a-z]+) {", a)) {
-      block = 1;
-      if (section == SERVICESTATUS && section != a[1])
-        printf("\n%s}\n",L3);
-      section = a[1];
-      # printf("[DEBUG] start block(%s)\n", section);
-    }
-    else if (match(line, "^\t}$")) {
-      if (section == HOSTSTATUS)
-        host_name = "";
-      if (section == SERVICESTATUS)
-        printf("\n%s}",L4);
-      # printf("[DEBUG] end block(%s)\n", section);
-      block = 0;
-    }
-    else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a)) {
-      # pass unwanted attributes
-      if (!(a[1] in REGISTER_S) && !(a[1] in REGISTER_I)) continue;
-      
-      if (section == HOSTSTATUS && a[1] == "host_name") {
-        host_name = a[2];
-        host_list[host_name] = 1;
-        host_attrs[host_name, a[1]] = a[2];
-      }
-      else if (section == HOSTSTATUS) {
-        host_attrs[host_name, a[1]] = a[2];
-      }
-      else if (section == SERVICESTATUS && a[1] == "host_name") {
-        # section change
-        if (a[2] != host_name) {
-          if (host_name) printf("%s},\n", L3);
-          host_name = a[2];
-          printf("%s\"%s\": {\n", L3, host_name);
-          printf("%s\"%s\": {\n", L4, "_HOST_");
-          host_attrs[host_name, "display_name"] = "_HOST_";
-          printf("%s\"%s\": \"%s\"", L5, "service_description", "_HOST_");
-          for (attr in REGISTER_S) {
-            if (!((host_name,attr) in host_attrs)) continue;
-            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
-          }
-          for (attr in REGISTER_I) {
-            if (!((host_name, attr) in host_attrs)) continue;
-            printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
-          }
-          printf("\n%s},\n", L4);
-        }
-        else {
-          printf(",\n");
-        }
-      }
-      else if (section == SERVICESTATUS && a[1] == "service_description") {
-        printf("%s\"%s\": {\n", L4, a[2]);
-        printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
-        printf("%s\"%s\": \"%s\"", L5, a[1], a[2]);
-      }
-      else if (section == SERVICESTATUS) {
-        if (a[1] in REGISTER_S)
-          printf(",\n%s\"%s\": \"%s\"", L5, a[1],
-                 gensub("[\\\\\"]", "\\\\\\0", "g", a[2]));
-        else
-          printf(",\n%s\"%s\": %s", L5, a[1], a[2]);
-      }
-    }
+  if (query == "servicelist") {
+    printf("%s\"servicelist\": {\n", L2);
+    main();
+    printf("%s}\n", L2);
   }
-  
-  printf("%s}\n", L2);
+  else if (query == "hostlist") {
+    printf("%s\"servicelist\": {\n", L2);
+    main();
+    printf("%s}\n", L2);
+  }
+
   printf("%s}\n", L1);
   printf("}\n");
   exit 0;
