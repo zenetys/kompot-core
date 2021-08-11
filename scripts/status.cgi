@@ -33,14 +33,15 @@
 function main() {
   while (getline line < NAGIOS_STATUS_FILE) {
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
-    if (match(line, "^([a-z]+) {", a)) {
+    if (substr(line, 1, 1) != "\t" && substr(line, length(line)-1, 2) == " {") {
+      new = substr(line, 1, length(line)-2);
       block = 1;
-      if (section == SERVICESTATUS && section != a[1])
-        printf("\n%s}\n",L3);
-      section = a[1];
+      if (section == SERVICESTATUS && section != new)
+        printf("\n%s}\n", L3);
+      section = new;
       # printf("[DEBUG] start block(%s)\n", section);
     }
-    else if (match(line, "^\t}$")) {
+    else if (line == "\t}") {
       if (section == HOSTSTATUS)
         host_name = "";
       if (section == SERVICESTATUS && host_name)
@@ -48,29 +49,32 @@ function main() {
       # printf("[DEBUG] end block(%s)\n", section);
       block = 0;
     }
-    else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a)) {
+    else if (block == 1 && substr(line, 1, 1) == "\t") {
+      pval = index(line, "=");
+      var = substr(line, 2, pval-2);
+      val = substr(line, pval+1);
       # pass unwanted attributes
-      if (!(a[1] in REGISTER_S) && !(a[1] in REGISTER_I)) continue;
+      if (!(var in REGISTER_S) && !(var in REGISTER_I)) continue;
       
-      if (section == HOSTSTATUS && a[1] == "host_name") {
-        if (filter && filter != a[2]) continue;
-        host_name = a[2];
-        host_list[host_name] = 1;
-        host_attrs[host_name, a[1]] = a[2];
+      if (section == HOSTSTATUS && var == "host_name") {
+        if (filter && filter != val) continue;
+        host_name = val;
+        # host_list[host_name] = 1;
+        host_attrs[host_name, var] = val;
       }
       else if (section == HOSTSTATUS) {
-        host_attrs[host_name, a[1]] = a[2];
+        host_attrs[host_name, var] = val;
       }
-      else if (section == SERVICESTATUS && a[1] == "host_name") {
+      else if (section == SERVICESTATUS && var == "host_name") {
 
         # section change
-        if (a[2] != host_name) {
-          if (filter && filter != a[2]) {
+        if (val != host_name) {
+          if (filter && filter != val) {
              host_name = "";
              continue;
           }
           if (host_name) printf("%s},\n", L3);
-          host_name = a[2];
+          host_name = val;
           printf("%s\"%s\": {\n", L3, host_name);
           printf("%s\"%s\": {\n", L4, "_HOST_");
           host_attrs[host_name, "display_name"] = "_HOST_";
@@ -89,17 +93,17 @@ function main() {
           printf(",\n");
         }
       }
-      else if (section == SERVICESTATUS && host_name && a[1] == "service_description") {
-        printf("%s\"%s\": {\n", L4, a[2]);
+      else if (section == SERVICESTATUS && host_name && var == "service_description") {
+        printf("%s\"%s\": {\n", L4, val);
         printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
-        printf("%s\"%s\": \"%s\"", L5, a[1], a[2]);
+        printf("%s\"%s\": \"%s\"", L5, var, val);
       }
       else if (section == SERVICESTATUS && host_name) {
-        if (a[1] in REGISTER_S)
-          printf(",\n%s\"%s\": \"%s\"", L5, a[1],
-                 gensub("[\\\\\"]", "\\\\\\0", "g", a[2]));
+        if (var in REGISTER_S)
+          printf(",\n%s\"%s\": \"%s\"", L5, var,
+                 gensub("[\\\\\"]", "\\\\\\0", "g", val));
         else
-          printf(",\n%s\"%s\": %s", L5, a[1], a[2]);
+          printf(",\n%s\"%s\": %s", L5, var, val);
       }
     }
   }
