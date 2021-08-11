@@ -57,14 +57,19 @@ function hostlist() {
         if (host_name) printf("\n%s},\n", L3);
         host_name = val;
         printf("%s\"%s\": {\n", L3, host_name);
-        printf("%s\"%s\": \"%s\"", L4, var, val);
+        printf("%s\"%s\": \"%s\"", L4, "name", val);
       }
       else if (section == HOSTSTATUS && host_name) {
-        if (var in REGISTER_S)
+        if (var in REGISTER_S) {
           printf(",\n%s\"%s\": \"%s\"", L4, var,
                  gensub("[\\\\\"]", "\\\\\\0", "g", val));
-        else
+        }
+        else if (var == "current_state") {
+          printf(",\n%s\"%s\": %s", L4, "status", HOST_STATE[val]);
+        }
+        else {
           printf(",\n%s\"%s\": %s", L4, var, val);
+        }
       }
     }
   }
@@ -117,8 +122,7 @@ function servicelist() {
           host_name = val;
           printf("%s\"%s\": {\n", L3, host_name);
           printf("%s\"%s\": {\n", L4, "_HOST_");
-          host_attrs[host_name, "display_name"] = "_HOST_";
-          printf("%s\"%s\": \"%s\"", L5, "service_description", "_HOST_");
+          printf("%s\"%s\": \"%s\"", L5, "description", "_HOST_");
           for (attr in REGISTER_S) {
             if (!((host_name,attr) in host_attrs)) continue;
             printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
@@ -136,14 +140,19 @@ function servicelist() {
       else if (section == SERVICESTATUS && host_name && var == "service_description") {
         printf("%s\"%s\": {\n", L4, val);
         printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
-        printf("%s\"%s\": \"%s\"", L5, var, val);
+        printf("%s\"%s\": \"%s\"", L5, "description", val);
       }
       else if (section == SERVICESTATUS && host_name) {
-        if (var in REGISTER_S)
+        if (var in REGISTER_S) {
           printf(",\n%s\"%s\": \"%s\"", L5, var,
                  gensub("[\\\\\"]", "\\\\\\0", "g", val));
-        else
+        }
+        else if (var == "current_state") {
+          printf(",\n%s\"%s\": %s", L4, "status", SERVICE_STATE[val]);
+        }
+        else {
           printf(",\n%s\"%s\": %s", L5, var, val);
+        }
       }
     }
   }
@@ -162,9 +171,9 @@ BEGIN {
   REGISTER_S["service_description"] = 1;
   REGISTER_S["plugin_output"] = 1;
   REGISTER_I["current_state"] = 1;
-  REGISTER_I["last_check"] = 1;
   REGISTER_I["current_attempt"] = 1;
   REGISTER_I["state_type"] = 1;
+  REGISTER_I["last_check"] = 1;
   REGISTER_I["last_state_change"] = 1;
   REGISTER_I["last_hard_state_change"] = 1;
   REGISTER_I["last_update"] = 1;
@@ -176,6 +185,15 @@ BEGIN {
   REGISTER_S["__TRACK"] = 1;
   REGISTER_S["__AUTOTRACK"] = 1;
   
+  SERVICE_STATE[0] = 2;
+  SERVICE_STATE[1] = 4;
+  SERVICE_STATE[2] = 16;
+  SERVICE_STATE[3] = 8;
+
+  HOST_STATE[0] = 2;
+  HOST_STATE[1] = 4;
+  HOST_STATE[2] = 8;
+
   split(QUERY_STRING, a, "&");
   for (ia in a) {
     # printf("DEBUG QS(%s)\n", a[ia]) > "/dev/stderr";
@@ -187,7 +205,13 @@ BEGIN {
     }
   }
   # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
-  
+
+  if (ENVIRON["SCRIPT_NAME"]) {
+    printf("Status: 200\r\n");
+    printf("Content-Type: application/json\r\n");
+    printf("\r\n");
+  }
+
   printf("{\n");
   printf("%s\"data\": {\n", L1);
 
