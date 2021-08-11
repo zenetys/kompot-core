@@ -31,6 +31,7 @@
 
 BEGIN {
   NAGIOS_STATUS_FILE = ENVIRON["NAGIOS_STATUS_FILE"];
+  QUERY_STRING = ENVIRON["QUERY_STRING"];
 
   L5 = " "( L4 = " "( L3 = " "( L2 = " "(L1 = " "))));
 
@@ -55,6 +56,14 @@ BEGIN {
   REGISTER_S["__TRACK"] = 1;
   REGISTER_S["__AUTOTRACK"] = 1;
   
+  split(QUERY_STRING, a);
+  for (attr in a) {
+    if (substr(a, 1, 9) == "hostname=") {
+      filter = substr(a, 10);
+      break;
+    }
+  }
+  
   printf("{\n");
   printf("%s\"data\": {\n", L1);
   printf("%s\"servicelist\": {\n", L2);
@@ -63,18 +72,22 @@ BEGIN {
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
     if (match(line, "^([a-z]+) {", a)) {
       block = 1;
+      if (section == SERVICESTATUS && section != a[1])
+        printf("\n%s}\n",L3);
       section = a[1];
       # printf("[DEBUG] start block(%s)\n", section);
     }
     else if (match(line, "^\t}$")) {
-      if (section == SERVICESTATUS) printf("\n%s}",L4);
+      if (section == HOSTSTATUS)
+        host_name = "";
+      if (section == SERVICESTATUS)
+        printf("\n%s}",L4);
       # printf("[DEBUG] end block(%s)\n", section);
       block = 0;
-      section = "";
     }
     else if (block == 1 && match(line, "^\t([^=]+)=(.*)", a)) {
       # pass unwanted attributes
-      if (!REGISTER_S[a[1]] && !REGISTER_I[a[1]]) continue;
+      if (!(a[1] in REGISTER_S) && !(a[1] in REGISTER_I)) continue;
       
       if (section == HOSTSTATUS && a[1] == "host_name") {
         host_name = a[2];
@@ -94,12 +107,12 @@ BEGIN {
           host_attrs[host_name, "display_name"] = "_HOST_";
           printf("%s\"%s\": \"%s\"", L5, "service_description", "_HOST_");
           for (attr in REGISTER_S) {
-            if (!host_attrs[host_name, attr]) continue;
+            if (!((host_name,attr) in host_attrs)) continue;
             printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
           }
           for (attr in REGISTER_I) {
-            if (!host_attrs[host_name, attr]) continue;
-            printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
+            if (!((host_name, attr) in host_attrs)) continue;
+            printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
           }
           printf("\n%s},\n", L4);
         }
@@ -113,7 +126,7 @@ BEGIN {
         printf("%s\"%s\": \"%s\"", L5, a[1], a[2]);
       }
       else if (section == SERVICESTATUS) {
-        if (REGISTER_S[a[1]])
+        if (a[1] in REGISTER_S)
           printf(",\n%s\"%s\": \"%s\"", L5, a[1],
                  gensub("[\\\\\"]", "\\\\\\0", "g", a[2]));
         else
