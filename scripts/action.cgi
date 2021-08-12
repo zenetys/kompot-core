@@ -36,11 +36,13 @@ function do_reset_state() {
     nagios_extcmd "DEL_ALL_HOST_COMMENTS;$host"
     nagios_extcmd "REMOVE_HOST_ACKNOWLEDGEMENT;$host"
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;0"
+    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_AUTOTRACK;0"
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_CLEAR_CACHE;1"
   else
     nagios_extcmd "DEL_ALL_SVC_COMMENTS;$host;$svc"
     nagios_extcmd "REMOVE_SVC_ACKNOWLEDGEMENT;$host;$svc"
     nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;0"
+    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_AUTOTRACK;0"
     nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_CLEAR_CACHE;1"
   fi
 }
