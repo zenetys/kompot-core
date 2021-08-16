@@ -208,6 +208,14 @@ BEGIN {
   }
   # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
 
+  if (query != "servicelist" && query != "hostlist") {
+    ret = system(ENVIRON["NAGIOS_STATUSJSON_CGI"]);
+    if (ret == 0 || ret > 127) exit(0);
+    printf("Status: 500\r\n");
+    printf("\r\n");
+    exit(0);
+  }
+
   if (ENVIRON["SCRIPT_NAME"]) {
     printf("Status: 200\r\n");
     printf("Content-Type: application/json\r\n");
