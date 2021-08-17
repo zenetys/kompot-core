@@ -29,6 +29,25 @@
 ##
 #
 
+function dump_attr_json(sp, var, val) {
+        if (var == "current_state") {
+          printf(",\n%s\"%s\": %s", L4, "status", SERVICE_STATE[val]);
+        }
+        else if (var in REGISTER_S) {
+          printf(",\n%s\"%s\": \"%s\"", L5, var,
+                 gensub("[\\\\\"]", "\\\\\\0", "g", val));
+        }
+        else if (var in REGISTER_I) {
+          printf(",\n%s\"%s\": %s", L5, var, val);
+        }
+        else if (var in REGISTER_B) {
+          printf(",\n%s\"%s\": %s", L5, var, val?"true":"false");
+        }
+        else if (var in REGISTER_T) {
+          printf(",\n%s\"%s\": %s", L5, var, val*1000);
+        }
+}
+
 function hostlist() {
   while (getline line < NAGIOS_STATUS_FILE) {
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
@@ -50,7 +69,11 @@ function hostlist() {
       var = substr(line, 2, pval-2);
       val = substr(line, pval+1);
       # pass unwanted attributes
-      if (!(var in REGISTER_S) && !(var in REGISTER_I)) continue;
+      if (!(var in REGISTER_S) &&
+          !(var in REGISTER_I) &&
+          !(var in REGISTER_T) &&
+          !(var in REGISTER_B))
+        continue;
       
       if (section == HOSTSTATUS && var == "host_name") {
         if (filter && filter != val) { host_name = ""; continue; }
@@ -60,16 +83,7 @@ function hostlist() {
         printf("%s\"%s\": \"%s\"", L4, "name", val);
       }
       else if (section == HOSTSTATUS && host_name) {
-        if (var in REGISTER_S) {
-          printf(",\n%s\"%s\": \"%s\"", L4, var,
-                 gensub("[\\\\\"]", "\\\\\\0", "g", val));
-        }
-        else if (var == "current_state") {
-          printf(",\n%s\"%s\": %s", L4, "status", HOST_STATE[val]);
-        }
-        else {
-          printf(",\n%s\"%s\": %s", L4, var, val);
-        }
+        dump_attr_json(L4, var, val);
       }
     }
   }
@@ -102,7 +116,11 @@ function servicelist() {
       var = substr(line, 2, pval-2);
       val = substr(line, pval+1);
       # pass unwanted attributes
-      if (!(var in REGISTER_S) && !(var in REGISTER_I)) continue;
+      if (!(var in REGISTER_S) &&
+          !(var in REGISTER_I) &&
+          !(var in REGISTER_T) &&
+          !(var in REGISTER_B))
+        continue;
       
       if (section == HOSTSTATUS && var == "host_name") {
         if (filter && filter != val) { host_name = ""; continue; }
@@ -124,14 +142,8 @@ function servicelist() {
           if (0) {
             printf("%s\"%s\": {\n", L4, "_HOST_");
             printf("%s\"%s\": \"%s\"", L5, "description", "_HOST_");
-            for (attr in REGISTER_S) {
-              if (!((host_name,attr) in host_attrs)) continue;
-              printf(",\n%s\"%s\": \"%s\"", L5, attr, host_attrs[host_name, attr]);
-            }
-            for (attr in REGISTER_I) {
-              if (!((host_name, attr) in host_attrs)) continue;
-              printf(",\n%s\"%s\": %s", L5, attr, host_attrs[host_name, attr]);
-            }
+            if (!((host_name,attr) in host_attrs)) continue;
+            dump_attr_json(L5, attr, host_attrs[host_name, attr]);
             printf("\n%s},\n", L4);
           }
         }
@@ -145,16 +157,7 @@ function servicelist() {
         printf("%s\"%s\": \"%s\"", L5, "description", val);
       }
       else if (section == SERVICESTATUS && host_name) {
-        if (var in REGISTER_S) {
-          printf(",\n%s\"%s\": \"%s\"", L5, var,
-                 gensub("[\\\\\"]", "\\\\\\0", "g", val));
-        }
-        else if (var == "current_state") {
-          printf(",\n%s\"%s\": %s", L4, "status", SERVICE_STATE[val]);
-        }
-        else {
-          printf(",\n%s\"%s\": %s", L5, var, val);
-        }
+        dump_attr_json(L5, var, val);
       }
     }
   }
@@ -171,21 +174,22 @@ BEGIN {
   
   REGISTER_S["host_name"] = 1;
   REGISTER_S["service_description"] = 1;
+  REGISTER_S["display_name"] = 1;
   REGISTER_S["plugin_output"] = 1;
+  REGISTER_S["__TRACK"] = 1;
+  REGISTER_S["__AUTOTRACK"] = 1;
   REGISTER_I["current_state"] = 1;
   REGISTER_I["current_attempt"] = 1;
   REGISTER_I["state_type"] = 1;
-  REGISTER_I["last_check"] = 1;
-  REGISTER_I["last_state_change"] = 1;
-  REGISTER_I["last_hard_state_change"] = 1;
-  REGISTER_I["last_update"] = 1;
-  REGISTER_I["notifications_enabled"] = 1;
-  REGISTER_I["problem_has_been_acknowledged"] = 1;
-  REGISTER_I["active_checks_enabled"] = 1;
-  REGISTER_I["passive_checks_enabled"] = 1;
-  REGISTER_I["is_flapping"] = 1;
-  REGISTER_S["__TRACK"] = 1;
-  REGISTER_S["__AUTOTRACK"] = 1;
+  REGISTER_T["last_check"] = 1;
+  REGISTER_T["last_state_change"] = 1;
+  REGISTER_T["last_hard_state_change"] = 1;
+  REGISTER_T["last_update"] = 1;
+  REGISTER_B["notifications_enabled"] = 1;
+  REGISTER_B["problem_has_been_acknowledged"] = 1;
+  REGISTER_B["active_checks_enabled"] = 1;
+  REGISTER_B["passive_checks_enabled"] = 1;
+  REGISTER_B["is_flapping"] = 1;
   
   SERVICE_STATE[0] = 2;
   SERVICE_STATE[1] = 4;
