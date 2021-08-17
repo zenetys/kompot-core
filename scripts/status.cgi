@@ -41,7 +41,7 @@ function dump_attr_json(sp, var, val) {
           printf(",\n%s\"%s\": %s", L5, var, val);
         }
         else if (var in REGISTER_B) {
-          printf(",\n%s\"%s\": %s", L5, var, val?"true":"false");
+          printf(",\n%s\"%s\": %s", L5, var, val==0?"false":"true");
         }
         else if (var in REGISTER_T) {
           printf(",\n%s\"%s\": %s", L5, var, val*1000);
