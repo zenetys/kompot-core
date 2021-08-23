@@ -228,14 +228,14 @@ function hoststatus() {
   }
   cr = "";
   for (host_name in state) {
-    printf("%s%s\"%s\": {\n", cr, L2, host_name);
-    printf("%s\"%s\": \"%s\",\n", L3, "name", host_name);
-    printf("%s\"%s\": \"%s\",\n", L3, "output", gensub("\"", "\\\\\"", "g", output[host_name]));
-    printf("%s\"%s\": %s\n", L3, "state", state[host_name]);
-    printf("%s}", L2);
+    printf("%s%s\"%s\": {\n", cr, L3, host_name);
+    printf("%s\"%s\": \"%s\",\n", L4, "name", host_name);
+    printf("%s\"%s\": \"%s\",\n", L4, "output", gensub("\"", "\\\\\"", "g", output[host_name]));
+    printf("%s\"%s\": %s\n", L4, "state", state[host_name]);
+    printf("%s}", L3);
     cr = ",\n";
   }
-  if (length(state) > 0) printf("%s\n", L2);
+  if (length(state) > 0) printf("%s\n", L3);
 }
 
 BEGIN {
@@ -287,8 +287,7 @@ BEGIN {
   }
   # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
 
-  if ((length(ENVIRON["REQUEST_URI"]) == 6 && ENVIRON["REQUEST_URI"] == "/api/s") ||
-      (substr(ENVIRON["REQUEST_URI"], 1, 7) == "/api/s/")) {
+  if (substr(ENVIRON["REQUEST_URI"], 1, 5) == "/api/") {
     if (ENVIRON["SCRIPT_NAME"]) {
       printf("Status: 200\r\n");
       printf("Content-Type: application/json\r\n");
@@ -326,7 +325,9 @@ BEGIN {
     printf("%s}\n", L2);
   }
   else {
+    printf("%s\"hosts\": {\n", L2);
     hoststatus();
+    printf("%s}\n", L2);
   }
 
   printf("%s}\n", L1);
