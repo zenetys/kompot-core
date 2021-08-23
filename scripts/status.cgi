@@ -163,6 +163,81 @@ function servicelist() {
   }
 }
 
+function hoststatus() {
+  while (getline line < NAGIOS_STATUS_FILE) {
+    # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
+    if (substr(line, 1, 1) != "\t" && substr(line, length(line)-1, 2) == " {") {
+      new = substr(line, 1, length(line)-2);
+      block = 1;
+      section = new;
+      current_state = "";
+      # printf("[DEBUG] start block(%s)\n", section);
+    }
+    else if (line == "\t}") {
+
+      if (current_state > 0 && host_name) {
+        if (state[host_name] <= current_state) {
+          state[host_name] = current_state;
+        }
+        if (current_state < 4) {
+          output[host_name] = sprintf("%s%s: %s<br>", output[host_name], current_service, current_output);
+        }
+      }
+
+      if (section == HOSTSTATUS) {
+        host_name = "";
+      }
+
+      # printf("[DEBUG] end block(%s)\n", section);
+      block = 0;
+    }
+    else if (block == 1 && substr(line, 1, 1) == "\t") {
+      pval = index(line, "=");
+      var = substr(line, 2, pval-2);
+      val = substr(line, pval+1);
+      # pass unwanted attributes
+
+      if (section == HOSTSTATUS && var == "host_name") {
+        if (filter && filter != val) { host_name = ""; continue; }
+        host_name = val;
+      }
+      else if (section == HOSTSTATUS && host_name) {
+        if (var == "current_state") {
+          state[host_name] = (val == 1 ? 4 : val == 2 ? 5 : 0);
+        }
+      }
+      else if (section == SERVICESTATUS && var == "host_name") {
+        # section change
+        if (val != host_name) {
+          if (filter && filter != val) { host_name = ""; continue; }
+          host_name = val;
+        }
+      }
+      else if (section == SERVICESTATUS && host_name) {
+        if (var == "current_state") {
+          current_state = val;
+        }
+        else if (var == "service_description") {
+          current_service = val;
+        }
+        else if (var == "plugin_output") {
+          current_output = val;
+       }
+      }
+    }
+  }
+  cr = "";
+  for (host_name in state) {
+    printf("%s%s\"%s\": {\n", cr, L2, host_name);
+    printf("%s\"%s\": \"%s\",\n", L3, "name", host_name);
+    printf("%s\"%s\": \"%s\",\n", L3, "output", gensub("\"", "\\\\\"", "g", output[host_name]));
+    printf("%s\"%s\": %s\n", L3, "state", state[host_name]);
+    printf("%s}", L2);
+    cr = ",\n";
+  }
+  if (length(state) > 0) printf("%s\n", L2);
+}
+
 BEGIN {
   NAGIOS_STATUS_FILE = ENVIRON["NAGIOS_STATUS_FILE"];
   QUERY_STRING = ENVIRON["QUERY_STRING"];
@@ -212,18 +287,29 @@ BEGIN {
   }
   # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
 
-  if (query != "servicelist" && query != "hostlist") {
-    ret = system(ENVIRON["NAGIOS_STATUSJSON_CGI"]);
-    if (ret == 0 || ret > 127) exit(0);
-    printf("Status: 500\r\n");
-    printf("\r\n");
-    exit(0);
+  if ((length(ENVIRON["REQUEST_URI"]) == 6 && ENVIRON["REQUEST_URI"] == "/api/s") ||
+      (substr(ENVIRON["REQUEST_URI"], 1, 7) == "/api/s/")) {
+    if (ENVIRON["SCRIPT_NAME"]) {
+      printf("Status: 200\r\n");
+      printf("Content-Type: application/json\r\n");
+      printf("\r\n");
+    }
   }
-
-  if (ENVIRON["SCRIPT_NAME"]) {
-    printf("Status: 200\r\n");
-    printf("Content-Type: application/json\r\n");
-    printf("\r\n");
+  else if (query == "servicelist" || query == "hostlist") {
+    if (ENVIRON["SCRIPT_NAME"]) {
+      printf("Status: 200\r\n");
+      printf("Content-Type: application/json\r\n");
+      printf("\r\n");
+    }
+  }
+  else {
+    ret = system(ENVIRON["NAGIOS_STATUSJSON_CGI"]);
+    if (ret > 0 && ret <= 127) {
+      printf("Status: 500\r\n");
+      printf("\r\n");
+      exit(0);
+    }
+    exit(0);
   }
 
   printf("{\n");
@@ -239,10 +325,12 @@ BEGIN {
     hostlist();
     printf("%s}\n", L2);
   }
+  else {
+    hoststatus();
+  }
 
   printf("%s}\n", L1);
   printf("}\n");
   exit 0;
 }
-
 
