@@ -34,6 +34,8 @@ BEGIN {
   REWRITE["servicestatus","current_state",1] = "WARNING";
   REWRITE["servicestatus","current_state",2] = "CRITICAL";
   REWRITE["servicestatus","current_state",3] = "UNKNOWN";
+
+  EXIT_CODE = 1;
 }
 { 
   if ($2 == "{") {
@@ -66,6 +68,7 @@ BEGIN {
     if (section == "hoststatus") {
       if (FSVC && FSVC != "_HOST_") { section = ""; next; }
       printf("\t%s\t%s", hname, "_HOST_");
+      EXIT_CODE = 0;
       next;
     }
     if (section == "servicestatus") { next; }
@@ -75,6 +78,7 @@ BEGIN {
     if (FSVC && FSVC != sname) { section = ""; next; }
     if (section == "servicestatus") {
       printf("\t%s\t%s", hname, sname);
+      EXIT_CODE = 0;
       next;
     }
   }
@@ -84,7 +88,16 @@ BEGIN {
     else
       printf("\t%s", val);
   }
-}' < $NAGIOS_STATUS_FILE | sort -k 1 -k 2 -k 3 | column -t
+}
 
+END {
+  exit(EXIT_CODE);
+}
+' < $NAGIOS_STATUS_FILE | sort -k 1 -k 2 -k 3 | column -t
 
+if [[ ${PIPESTATUS[0]} != 0 ]]; then
+  exit 1
+fi
+
+exit 0
 
