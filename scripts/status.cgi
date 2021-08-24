@@ -230,7 +230,7 @@ function hoststatus() {
   for (host_name in state) {
     printf("%s%s\"%s\": {\n", cr, L3, host_name);
     printf("%s\"%s\": \"%s\",\n", L4, "name", host_name);
-    printf("%s\"%s\": \"%s\",\n", L4, "output", gensub("\"", "\\\\\"", "g", output[host_name]));
+    printf("%s\"%s\": \"%s\",\n", L4, "output", gensub("(\"|\\\\)", "\\\\\\1", "g", output[host_name]));
     printf("%s\"%s\": %s\n", L4, "state", state[host_name]);
     printf("%s}", L3);
     cr = ",\n";
@@ -332,7 +332,7 @@ BEGIN {
     hoststatus();
     printf("%s}", L2);
     if (ENVIRON["DUMP_FULL_OUTPUT"]) {
-      printf(",\n%s\"output\": \"%s\"", L2, gensub("\"", "\\\\\"", "g", FULL_OUTPUT));
+      printf(",\n%s\"output\": \"%s\"", L2, gensub("(\"|\\\\)", "\\\\\\1", "g", FULL_OUTPUT));
     }
     printf("\n");
   }
