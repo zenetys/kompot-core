@@ -17,9 +17,11 @@ function do_alarm_off() {
 
 function do_ack() {
   if [[ $svc == _HOST_ ]]; then
-    nagios_extcmd "ACKNOWLEDGE_HOST_PROBLEM;$host;2;1;1;$AUTHOR;$COMMENT"
+    nagios_extcmd "ACKNOWLEDGE_HOST_PROBLEM;$host;2;0;1;$AUTHOR;$COMMENT"
+    sleep 2 && nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_AUTOTRACK;0"
   else
-    nagios_extcmd "ACKNOWLEDGE_SVC_PROBLEM;$host;$svc;2;1;1;$AUTHOR;$COMMENT"
+    nagios_extcmd "ACKNOWLEDGE_SVC_PROBLEM;$host;$svc;2;0;1;$AUTHOR;$COMMENT"
+    sleep 2 && nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_AUTOTRACK;0"
   fi
 }
 
@@ -41,16 +43,16 @@ function do_reset_state() {
     nagios_extcmd "SCHEDULE_FORCED_HOST_CHECK;$host;$NOW"
     nagios_extcmd "SCHEDULE_FORCED_HOST_SVC_CHECKS;$host;$NOW"
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_TRACK;0"
-    nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_AUTOTRACK;0"
     nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_CLEAR_CACHE;1"
+    sleep 2 && nagios_extcmd "CHANGE_CUSTOM_HOST_VAR;$host;_AUTOTRACK;0"
   else
     nagios_extcmd "DEL_ALL_SVC_COMMENTS;$host;$svc"
     nagios_extcmd "ENABLE_SVC_NOTIFICATIONS;$host;$svc"
     nagios_extcmd "REMOVE_SVC_ACKNOWLEDGEMENT;$host;$svc"
     nagios_extcmd "SCHEDULE_FORCED_SVC_CHECK;$host;$svc;$NOW"
     nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_TRACK;0"
-    nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_AUTOTRACK;0"
     nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_CLEAR_CACHE;1"
+    sleep 2 && nagios_extcmd "CHANGE_CUSTOM_SVC_VAR;$host;$svc;_AUTOTRACK;0"
   fi
 }
 
