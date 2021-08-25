@@ -192,6 +192,11 @@ function host-end() {
         services[$service]=1
       done
 
+      # mark disabled services
+      for service in ${DISABLED[$CURRENT_HOST]}; do
+        services[$service]=1
+      done
+
       # declare others services
       for service in ${HOST_SERVICES[$use]}; do
         [[ ${services[$service]} ]] && continue
@@ -229,6 +234,9 @@ function host-service() {
       name="$desc"
     )
     SERVICES[$desc]="$desc"
+  elif [[ $1 == --disable ]]; then
+    DISABLED[$CURRENT_HOST]+="$dname$IFS"
+    return 0
   elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
     attrs=(
       register=0
