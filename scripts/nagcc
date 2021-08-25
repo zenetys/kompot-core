@@ -191,7 +191,7 @@ else
   check_command="$CNAME"
 fi
 
-commanddef=$(extract_nagios_block ${OBJECTDB} "" "" "$check_command")
+commanddef=$(extract_nagios_block ${OBJECTDB} "" "" "${check_command%%\!*}")
 
 command_line=$(echo "$commanddef" | grep $'^\tcommand_line\t')
 command_line="${command_line#*command_line$'\t'}"
