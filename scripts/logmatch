@@ -265,7 +265,13 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
       e[ia] = ea[ia];
-      if (!PATTERNS[ir,ia]) continue;
+      if (!PATTERNS[ir,ia]) {
+        if (ia == HOSTNAME && ALIAS[e[ia]]) {
+          # rewrite HOSTNAME to aliases even if pattern empty
+          e[ia] = ALIAS[e[ia]];
+        }
+        continue;
+      }
 
       if (DEBUG >= 5) debug(sprintf("%s: match(%s,%s,%s) ?", RULENAMES[ir], IATTRS[ia], e[ia], PATTERNS[ir,ia]));
 
