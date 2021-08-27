@@ -153,9 +153,11 @@ function config( record, i, iattr, value, line) {
       else {
         iattr = MSG;
       }
-      value = substr($0, index($0, "\x22")+1);
-      value = substr(value, 1, index(value, "\x22")-1);
-      PATTERNS[record,iattr] = value;
+      value = substr($0, index($0, " ")+1);
+      if (substr(value, 1, 1) != "\x22" || substr(value, length(value), 1) != "\x22")
+        fatal(sprintf("%s:%d: config error: '%s'", CONFIG, line, value));
+      value = substr(value, 2, length(value)-2);
+      PATTERNS[record,iattr] = gensub("\\\\\"", "\"", "g", value);
       # debug(sprintf("PATTERNS[%d,%d] = %s", record, iattr, value));
     }
     else if (substr($1,1,7) == "REWRITE") {
@@ -169,16 +171,20 @@ function config( record, i, iattr, value, line) {
       else {
         iattr = MSG;
       }
-      value = substr($0, index($0, "\x22")+1);
-      value = substr(value, 1, index(value, "\x22")-1);
-      REWRITES[record,iattr] = value;
+      value = substr($0, index($0, " ")+1);
+      if (substr(value, 1, 1) != "\x22" || substr(value, length(value), 1) != "\x22")
+        fatal(sprintf("%s:%d: config error: '%s'", CONFIG, line, value));
+      value = substr(value, 2, length(value)-2);
+      REWRITES[record,iattr] = gensub("\\\\\"", "\"", "g", value);
       # debug(sprintf("REWRITES[%d,%d] = %s", record, iattr, value));
     }
     else if (substr($1,1,5) == "ATTR:") {
       iattr = substr($1,6);
-      value = substr($0, index($0, "\x22")+1);
-      value = substr(value, 1, index(value, "\x22")-1);
-      RULEATTRS[record,iattr] = value;
+      value = substr($0, index($0, " ")+1);
+      if (substr(value, 1, 1) != "\x22" || substr(value, length(value), 1) != "\x22")
+        fatal(sprintf("%s:%d: config error: '%s'", CONFIG, line, value));
+      value = substr(value, 2, length(value)-2);
+      RULEATTRS[record,iattr] = gensub("\\\\\"", "\"", "g", value);
       # debug(sprintf("REWRITES[%d,%d] = %s", record, iattr, value));
     }
     else if ($1 == "RULENAME") {
