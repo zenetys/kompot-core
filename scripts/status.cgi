@@ -268,15 +268,17 @@ BEGIN {
   REGISTER_B["active_checks_enabled"] = 1;
   REGISTER_B["passive_checks_enabled"] = 1;
   REGISTER_B["is_flapping"] = 1;
-  
-  SERVICE_STATE[0] = 2;
-  SERVICE_STATE[1] = 4;
-  SERVICE_STATE[2] = 16;
-  SERVICE_STATE[3] = 8;
 
-  HOST_STATE[0] = 2;
-  HOST_STATE[1] = 4;
-  HOST_STATE[2] = 8;
+  # 1 => SERVICE_PENDING
+  SERVICE_STATE[0] = 2;  # OK
+  SERVICE_STATE[1] = 4;  # WARNING
+  SERVICE_STATE[2] = 16; # CRITICAL
+  SERVICE_STATE[3] = 8;  # UNKNOWN
+
+  # 1 => HOST_PENDING
+  HOST_STATE[0] = 2;     # UP
+  HOST_STATE[1] = 4;     # DOWN
+  HOST_STATE[2] = 8;     # UNREACHABLE
 
   split(QUERY_STRING, a, "&");
   for (ia in a) {
