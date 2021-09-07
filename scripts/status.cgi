@@ -31,7 +31,10 @@
 
 function dump_attr_json(sp, var, val) {
         if (var == "current_state") {
-          printf(",\n%s\"%s\": %s", L4, "status", SERVICE_STATE[val]);
+          printf(",\n%s\"%s\": %s", L5, "status", SERVICE_STATE[val]);
+        }
+        else if (var == "active_checks_enabled") {
+          printf(",\n%s\"%s\": %s", L5, "checks_enabled", val==0?"false":"true");
         }
         else if (var in REGISTER_S) {
           printf(",\n%s\"%s\": \"%s\"", L5, var,
@@ -259,6 +262,7 @@ BEGIN {
   REGISTER_I["current_state"] = 1;
   REGISTER_I["current_attempt"] = 1;
   REGISTER_I["state_type"] = 1;
+  REGISTER_I["check_type"] = 1;
   REGISTER_T["last_check"] = 1;
   REGISTER_T["last_state_change"] = 1;
   REGISTER_T["last_hard_state_change"] = 1;
