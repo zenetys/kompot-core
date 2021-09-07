@@ -43,6 +43,15 @@ function do_alarm_off() {
   fi
 }
 
+function do_disable() {
+  if [[ $svc == _HOST_ ]]; then
+    nagios_extcmd "DISABLE_HOST_CHECK;$host"
+    nagios_extcmd "DISABLE_HOST_SVC_CHECKS;$host"
+  else
+    nagios_extcmd "DISABLE_SVC_CHECK;$host;$svc"
+  fi
+}
+
 function do_ack() {
   if [[ $svc == _HOST_ ]]; then
     nagios_extcmd "ACKNOWLEDGE_HOST_PROBLEM;$host;2;0;1;$AUTHOR;$COMMENT"
