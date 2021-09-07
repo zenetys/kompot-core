@@ -30,24 +30,21 @@
 #
 
 function dump_attr_json(sp, var, val) {
-        if (var == "current_state") {
-          printf(",\n%s\"%s\": %s", L5, "status", SERVICE_STATE[val]);
-        }
-        else if (var == "active_checks_enabled") {
-          printf(",\n%s\"%s\": %s", L5, "checks_enabled", val==0?"false":"true");
+        if (var == "active_checks_enabled") {
+          printf(",\n%s\"%s\": %s", sp, "checks_enabled", val==0?"false":"true");
         }
         else if (var in REGISTER_S) {
-          printf(",\n%s\"%s\": \"%s\"", L5, var,
+          printf(",\n%s\"%s\": \"%s\"", sp, var,
                  gensub("[\\\\\"]", "\\\\\\0", "g", val));
         }
         else if (var in REGISTER_I) {
-          printf(",\n%s\"%s\": %s", L5, var, val);
+          printf(",\n%s\"%s\": %s", sp, var, val);
         }
         else if (var in REGISTER_B) {
-          printf(",\n%s\"%s\": %s", L5, var, val==0?"false":"true");
+          printf(",\n%s\"%s\": %s", sp, var, val==0?"false":"true");
         }
         else if (var in REGISTER_T) {
-          printf(",\n%s\"%s\": %s", L5, var, val*1000);
+          printf(",\n%s\"%s\": %s", sp, var, val*1000);
         }
 }
 
@@ -84,6 +81,9 @@ function hostlist() {
         host_name = val;
         printf("%s\"%s\": {\n", L3, host_name);
         printf("%s\"%s\": \"%s\"", L4, "name", val);
+      }
+      else if (section == HOSTSTATUS && host_name && var == "current_state") {
+        dump_attr_json(L4, "status", HOST_STATE[val]);
       }
       else if (section == HOSTSTATUS && host_name) {
         dump_attr_json(L4, var, val);
@@ -154,13 +154,18 @@ function servicelist() {
           printf(",\n");
         }
       }
-      else if (section == SERVICESTATUS && host_name && var == "service_description") {
-        printf("%s\"%s\": {\n", L4, val);
-        printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
-        printf("%s\"%s\": \"%s\"", L5, "description", val);
-      }
       else if (section == SERVICESTATUS && host_name) {
-        dump_attr_json(L5, var, val);
+        if (var == "service_description") {
+          printf("%s\"%s\": {\n", L4, val);
+          printf("%s\"%s\": \"%s\",\n", L5, "host_name", host_name);
+          printf("%s\"%s\": \"%s\"", L5, "description", val);
+        }
+        else if (var == "current_state") {
+          dump_attr_json(L5, "status", SERVICE_STATE[val]);
+        }
+        else if (section == SERVICESTATUS && host_name) {
+          dump_attr_json(L5, var, val);
+        }
       }
     }
   }
@@ -259,6 +264,7 @@ BEGIN {
   REGISTER_S["plugin_output"] = 1;
   REGISTER_S["__TRACK"] = 1;
   REGISTER_S["__AUTOTRACK"] = 1;
+  REGISTER_I["status"] = 1;
   REGISTER_I["current_state"] = 1;
   REGISTER_I["current_attempt"] = 1;
   REGISTER_I["state_type"] = 1;
