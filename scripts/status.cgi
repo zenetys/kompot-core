@@ -184,7 +184,7 @@ function hoststatus() {
     else if (line == "\t}") {
 
       if (current_state > 0 && host_name) {
-        if (state[host_name] <= current_state) {
+        if (state[host_name] < current_state) {
           state[host_name] = current_state;
         }
         if (current_state < 4) {
@@ -211,7 +211,7 @@ function hoststatus() {
       }
       else if (section == HOSTSTATUS && host_name) {
         if (var == "current_state") {
-          state[host_name] = (val == 1 ? 4 : val == 2 ? 5 : 0);
+          state[host_name] = GLOBAL_STATE[100+val];;
         }
       }
       else if (section == SERVICESTATUS && var == "host_name") {
@@ -223,7 +223,7 @@ function hoststatus() {
       }
       else if (section == SERVICESTATUS && host_name) {
         if (var == "current_state") {
-          current_state = val;
+          current_state = GLOBAL_STATE[110+val];
         }
         else if (var == "service_description") {
           current_service = val;
@@ -289,6 +289,14 @@ BEGIN {
   HOST_STATE[0] = 2;     # UP
   HOST_STATE[1] = 4;     # DOWN
   HOST_STATE[2] = 8;     # UNREACHABLE
+
+  GLOBAL_STATE[100] = 4; # HOST+UP
+  GLOBAL_STATE[101] = 9; # HOST+DOWN
+  GLOBAL_STATE[102] = 7; # HOST+UNREACHABLE
+  GLOBAL_STATE[110] = 3; # SERVICE+OK
+  GLOBAL_STATE[111] = 5; # SERVICE+WARNING
+  GLOBAL_STATE[112] = 8; # SERVICE+CRITICAL
+  GLOBAL_STATE[113] = 6; # SERVICE+UNKNOWN
 
   split(QUERY_STRING, a, "&");
   for (ia in a) {
