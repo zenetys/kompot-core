@@ -103,8 +103,16 @@ function aliases(line) {
       debug(sprintf("ALIAS[%s] = %s", $i, $1));
     }
   }
+}
 
-
+function iconv(s) {
+  s = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", s);
+  s = gensub("(\302\240)", " ", "g", s);
+  s = gensub("(\351|\303\251|\303\211)", "é", "g", s);
+  s = gensub("(\350|\303\250)", "è", "g", s);
+  s = gensub("(\340|\303\240)", "à", "g", s);
+  s = gensub("(\344|\303\264)", "ô", "g", s);
+  return s;
 }
 
 function config( record, i, iattr, value, line) {
@@ -120,7 +128,7 @@ function config( record, i, iattr, value, line) {
   while (getline <CONFIG && !ERRNO) {
     line++;
     # convert UTF8 Right Single Quotation Mark & Left Single Quotation Mark
-    $0 = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", $0);
+    $0 = iconv($0);
     # bypass coments
     if (substr($0, 1, 1) == "#")
       continue;
@@ -414,11 +422,7 @@ BEGIN {
       continue;
     }
 
-    line = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", line);
-    line = gensub("\351", "\303\251", "g", line);
-    line = gensub("\350", "\303\250", "g", line);
-    line = gensub("\340", "\303\240", "g", line);
-    line = gensub("\347", "\303\247", "g", line);
+    line = iconv(line);
 
     main(line);
   }
