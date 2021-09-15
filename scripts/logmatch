@@ -415,10 +415,10 @@ BEGIN {
     }
 
     line = gensub("(\xE2\x80\x99|\xE2\x80\x98)", "'", "g", line);
-    line = gensub("\x351", "\x303\x251", "g", line);
-    line = gensub("\x350", "\x303\x250", "g", line);
-    line = gensub("\x340", "\x303\x240", "g", line);
-    line = gensub("\x347", "\x303\x247", "g", line);
+    line = gensub("\351", "\303\251", "g", line);
+    line = gensub("\350", "\303\250", "g", line);
+    line = gensub("\340", "\303\240", "g", line);
+    line = gensub("\347", "\303\247", "g", line);
 
     main(line);
   }
