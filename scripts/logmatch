@@ -105,25 +105,34 @@ function aliases(line) {
   }
 }
 
-function iconv(s) {
+function iconv_utf8(s) {
   if (match(s, "[\177-\377]")) {
-    s = gensub("(\222|\342\200\231)", "'", "g", s);
-    s = gensub("(\302\240|\240)", " ", "g", s);
-    s = gensub("(\302\251|\251)", "@", "g", s);
-    s = gensub("(\302\253|\253)", "«", "g", s);
-    s = gensub("(\302\273|\273)", "»", "g", s);
-    s = gensub("(\302\265|\265)", "û", "g", s);
-    s = gensub("(\303\240|\340)", "à", "g", s);
-    s = gensub("(\303\242|\342)", "â", "g", s);
-    s = gensub("(\303\247|\347)", "ç", "g", s);
-    s = gensub("(\303\251|\351)", "é", "g", s);
-    s = gensub("(\303\211|\311)", "É", "g", s);
-    s = gensub("(\303\250|\350)", "è", "g", s);
-    s = gensub("(\303\252|\352)", "ê", "g", s);
-    s = gensub("(\303\256|\356)", "ê", "g", s);
-    s = gensub("(\303\264|\364)", "ô", "g", s);
-    s = gensub("(\305\223|\234)", "œ", "g", s);
-    s = gensub("(\303\273|\373)", "û", "g", s);
+    s = gensub("\342\200\231", "'", "g", s);
+    s = gensub("\302\240", " ", "g", s);
+    s = gensub("\302\251", "@", "g", s);
+  }
+  return s;
+}
+
+function iconv_cp1252(s) {
+  if (match(s, "[\177-\377]")) {
+    s = gensub("\222", "'", "g", s);
+    s = gensub("\240", " ", "g", s);
+    s = gensub("\251", "@", "g", s);
+    s = gensub("\253", "«", "g", s);
+    s = gensub("\273", "»", "g", s);
+    s = gensub("\265", "û", "g", s);
+    s = gensub("\340", "à", "g", s);
+    s = gensub("\342", "â", "g", s);
+    s = gensub("\347", "ç", "g", s);
+    s = gensub("\351", "é", "g", s);
+    s = gensub("\311", "É", "g", s);
+    s = gensub("\350", "è", "g", s);
+    s = gensub("\352", "ê", "g", s);
+    s = gensub("\356", "ê", "g", s);
+    s = gensub("\364", "ô", "g", s);
+    s = gensub("\234", "œ", "g", s);
+    s = gensub("\373", "û", "g", s);
   }
   return s;
 }
@@ -141,7 +150,7 @@ function config( record, i, iattr, value, line) {
   while (getline <CONFIG && !ERRNO) {
     line++;
     # convert UTF8 Right Single Quotation Mark & Left Single Quotation Mark
-    $0 = iconv($0);
+    $0 = iconv_utf8($0);
     # bypass coments
     if (substr($0, 1, 1) == "#")
       continue;
@@ -435,7 +444,7 @@ BEGIN {
       continue;
     }
 
-    line = iconv(line);
+    line = iconv_utf8(iconv_cp1252(line));
 
     main(line);
   }
