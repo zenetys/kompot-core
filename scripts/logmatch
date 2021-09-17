@@ -334,15 +334,22 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     # compute new attrs
     e[RULENAME] = RULENAMES[ir];
     if (RULEATTRS[ir,"NAGIOS_FORCED_HOST"]) {
-      if (substr(RULEATTRS[ir,"NAGIOS_FORCED_HOST"], 1, 1) == "\\") {
+      if (index(RULEATTRS[ir,"NAGIOS_FORCED_HOST"], "\\")) {
         e[HOSTNAME] = rewrite(RULEATTRS[ir,"NAGIOS_FORCED_HOST"], matches);
       }
       else {
         e[HOSTNAME] = RULEATTRS[ir,"NAGIOS_FORCED_HOST"];
       }
     }
-    if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"])
-      e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];
+    if (RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"]) {
+      if (index(RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"], "\\")) {
+        e[PROGRAM] = rewrite(RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"], matches);
+      }
+      else {
+        e[PROGRAM] = RULEATTRS[ir,"NAGIOS_FORCED_SERVICE"];
+      }
+    }
+
     e[NAGIOS_STATE] = NAGIOS_STATES[and(FLAGS[ir],0x00f0)]
 
     if (THRESHOLDS_COUNT[ir]) {
