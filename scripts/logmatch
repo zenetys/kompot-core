@@ -275,7 +275,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
 
   # read record separated by Tabs
   F = "([^\\t]*)\\t"
-  if (!match(line, "^" F F F F F F F "(.*)", ea)) {
+  if (!match(line, "^" F F F F F F F " ?(.*)", ea)) {
     rsyslog_ack();
     return;
   }
@@ -388,6 +388,13 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
 }
 
 BEGIN {
+
+  if (DEBUG >= 5) {
+    printf("DEBUG=%s\n", DEBUG) >>"/dev/stderr";
+    printf("CONFIG=%s, ALIASES=%s\n", CONFIG, ALIASES) >>"/dev/stderr";
+    printf("NAGIOS_EXTERNAL_COMMAND_FILE=%s\n", NAGIOS_EXTERNAL_COMMAND_FILE) >>"/dev/stderr";
+  }
+
   # read timeout on stding : 1000ms
   PROCINFO["/dev/stdin", "READ_TIMEOUT"] = 1000;
   PROCINFO["/dev/stdin", "RETRY"] = 1;
@@ -443,13 +450,15 @@ BEGIN {
   ##########################################
   # main loop
   while (ret = getline line < "/dev/stdin") {
-    if (DEBUG >=2) debug(sprintf("read: line=<%s> ret=%d", line, ret));
 
     if (ret < 0) {
+      if (DEBUG >=2) debug(sprintf("read timeout: ret=%d", ret));
       # timeout
       cleanup_watchers();
       continue;
     }
+
+    if (DEBUG >=2) debug(sprintf("read: line=<%s>", line));
 
     line = iconv_utf8(iconv_cp1252(line));
 
