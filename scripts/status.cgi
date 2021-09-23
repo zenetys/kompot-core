@@ -230,7 +230,7 @@ function hoststatus() {
         }
         else if (var == "plugin_output") {
           current_output = val;
-       }
+        }
       }
     }
   }
