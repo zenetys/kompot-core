@@ -183,7 +183,7 @@ function hoststatus() {
     }
     else if (line == "\t}") {
 
-      if (current_state > 0 && host_name) {
+      if (current_state > 0 && host_name && current_notif == 1) {
         if (state[host_name] < current_state) {
           state[host_name] = current_state;
         }
@@ -230,6 +230,9 @@ function hoststatus() {
         }
         else if (var == "plugin_output") {
           current_output = val;
+        }
+        else if (var == "notifications_enabled") {
+          current_notif = val;
         }
       }
     }
