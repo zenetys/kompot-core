@@ -18,7 +18,7 @@ if [[ -z $HST ]]; then
 fi
 
 if [[ -e $NAGIOS_EXTERNAL_COMMAND_FILE ]]; then
-  echo "[$(date +%s)] PROCESS_SERVICE_CHECK_RESULT;$HST${SVC:+$SVC;};${STATE:-0};${MSG:-OK}" >> $NAGIOS_EXTERNAL_COMMAND_FILE
+  echo "[$(date +%s)] PROCESS_SERVICE_CHECK_RESULT;$HST${SVC:+;$SVC};${STATE:-0};${MSG:-OK}" >> $NAGIOS_EXTERNAL_COMMAND_FILE
 else
   echo "ERROR" >&2
   exit 3
