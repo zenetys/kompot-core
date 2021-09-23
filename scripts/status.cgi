@@ -187,7 +187,7 @@ function hoststatus() {
         if (state[host_name] < current_state) {
           state[host_name] = current_state;
         }
-        if (current_state < 4) {
+        if (current_state > 4) {
           output[host_name] = sprintf("%s<b>%s:%s</b>: %s<br>", output[host_name], host_name, current_service, current_output);
         }
       }
