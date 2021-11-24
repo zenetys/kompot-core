@@ -278,6 +278,7 @@ declare XDEBUG=${XDEBUG:-0}
 declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
+declare -A DISABLED=( )
 declare -A HOST_SERVICES=( )
 declare -A HOST_TEMPLATE=( )
 declare -A HOST_FULLNAME=( )
