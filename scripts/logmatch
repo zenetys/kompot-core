@@ -460,7 +460,8 @@ BEGIN {
 
     if (DEBUG >=2) debug(sprintf("read: line=<%s>", line));
 
-    line = iconv_utf8(iconv_cp1252(line));
+    # line = iconv_utf8(iconv_cp1252(line));
+    line = iconv_utf8(line);
 
     main(line);
   }
