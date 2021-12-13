@@ -50,6 +50,7 @@ function dump_attr_json(sp, var, val) {
 
 function hostlist() {
   while (getline line < NAGIOS_STATUS_FILE) {
+    if (ERRNOR) exit(1);
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
     if (substr(line, 1, 1) != "\t" && substr(line, length(line)-1, 2) == " {") {
       new = substr(line, 1, length(line)-2);
@@ -94,6 +95,7 @@ function hostlist() {
 
 function servicelist() {
   while (getline line < NAGIOS_STATUS_FILE) {
+    if (ERRNOR) exit(1);
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
     if (substr(line, 1, 1) != "\t" && substr(line, length(line)-1, 2) == " {") {
       new = substr(line, 1, length(line)-2);
@@ -173,6 +175,7 @@ function servicelist() {
 
 function hoststatus() {
   while (getline line < NAGIOS_STATUS_FILE) {
+	if (ERRNO) exit(1);
     # printf("[DEBUG] line: %s\n", line) >> "/dev/stderr";
     if (substr(line, 1, 1) != "\t" && substr(line, length(line)-1, 2) == " {") {
       new = substr(line, 1, length(line)-2);
