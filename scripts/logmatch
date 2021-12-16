@@ -364,6 +364,8 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
       # increment task and check for threshold
       if (WATCHERS_COUNT[e[HOSTNAME],e[PROGRAM]] < THRESHOLDS_COUNT[ir])
         notify = 0;
+      else
+        delete WATCHERS_COUNT[e[HOSTNAME],e[PROGRAM]];
     }
 
     if (notify == 0) continue;
