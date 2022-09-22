@@ -1,0 +1,131 @@
+#!/bin/bash
+
+exec 2>/tmp/${0##*/}.debug
+set -x
+
+SNMPTRAPD_CONF=/var/lib/snmp/snmptrapd.local.conf
+
+function onExit() {
+  local exitcode=$?
+  [[ $HAVELOCK == 1 && -e $SNMPTRAPD_CONF.lock ]] && rm $SNMPTRAPD_CONF.lock
+  exit $exitcode
+}
+
+function main() {
+  local version
+  local pproto ppass
+  local aproto apass
+  local secname seclevel
+  local hostname
+
+  while (( $# > 0 )); do
+    case $1 in
+      --handler) control=$2; shift;;
+      -v) version=$2; shift ;;
+      -x) pproto=$2; shift ;;
+      -X) ppass=$2; shift ;;
+      -a) aproto=$2; shift ;;
+      -A) apass=$2; shift ;;
+      -l) seclevel=$2; shift ;;
+      -u) secname=$2; shift ;;
+      -*) usage "undefined option '$1'" && return 3 ;;
+      *) {
+        if [[ $hostname ]]; then
+          usage "bad argument '$1'" && return 3
+        fi
+        hostname=$1
+      } ;;
+    esac
+    shift
+  done
+
+ if [[ -z $hostname ]]; then
+    # no hostname
+    return 3
+  fi
+
+  local snmpcred=(
+    ${version:+-v $version}
+    ${pproto:+-x "$pproto"}
+    ${ppass:+-X "$ppass"}
+    ${aproto:+-a "$aproto"}
+    ${apass:+-A "$apass"}
+    ${seclevel:+-l "$seclevel"}
+    ${secname:+-u "$secname"}
+  )
+
+  local engineid_oid=.1.3.6.1.6.3.10.2.1.1.0
+  local engineid
+  eval "engineid=$(snmpget -m '' -M '' -Ih -Oxvq --hexOutputLength=0 "${snmpcred[@]}" $hostname $engineid_oid)"
+  engineid=0x${engineid// }
+
+  if [[ $engineid == 0x ]] ; then
+    # empty engineid
+    return 3
+  fi
+
+  entry="createUser -e $engineid \"$secname\" $aproto \"$apass\" $pproto \"$ppass\""
+
+  # create file
+  [[ -e $SNMPTRAPD_CONF ]] || touch $SNMPTRAPD_CONF
+
+  while ! ln $SNMPTRAPD_CONF $SNMPTRAPD_CONF.lock 2>/dev/null && (( $SECONDS < 5 )); do sleep 0.1; done
+  (( $SECONDS >= 5 )) && return 3 # can't take lock
+  HAVELOCK=1
+
+  if grep -q -F "# $hostname $engineid OK" $SNMPTRAPD_CONF; then
+    # already exists then engineid is uniq in file
+    if grep -q -F -- "$entry" $SNMPTRAPD_CONF; then
+      return 0 # no change, bypass
+    else
+      # credentials change for this host+engineid, replace it
+      sed -i "s/.*createUser -e $engineid/$entry/" $SNMPTRAPD_CONF
+    fi
+  elif grep -q -F -- "-e $engineid " $SNMPTRAPD_CONF; then
+    # engineid already exists, for some other host
+    if grep -q -F "# $hostname " $SNMPTRAPD_CONF; then
+      # host exists with other engineid, update with error
+      sed -i "/^# $hostname /{s/^# $hostname .*/# $hostname $engineid DUPLICATE/;n;s/^createUser.*/$entry/}" $SNMPTRAPD_CONF
+    else
+      # create host with error
+      printf "# $hostname $engineid DUPLICATE\n# $entry\n\n" >> $SNMPTRAPD_CONF
+    fi
+    conflicts=( $(sed -rne "s/^# (.*) $engineid .*/\1/p" $SNMPTRAPD_CONF) )
+    ${0%/*}/nagcmd-passive $HOSTNAME CTRL-DOUBL-ENGINEID CRITICAL "Duplicate EngineID: ${conflicts[*]}"
+    return 2
+  else
+    # no duplicate entry, add or update host
+    if grep -q -F "# $hostname " $SNMPTRAPD_CONF; then
+      # host exists with other engineid
+      sed -i "/^# $hostname /{s/^# $hostname .*/# $hostname $engineid OK/;n;s/^createUser.*/$entry/}" $SNMPTRAPD_CONF
+    else
+      # create host with error
+      printf "# $hostname $engineid OK\n$entry\n\n" >> $SNMPTRAPD_CONF
+    fi
+  fi
+
+  # restart snmptrapd
+  systemctl restart snmptrapd
+
+  # remove lock
+  rm $SNMPTRAPD_CONF.lock
+  HAVELOCK=0
+
+  return 0
+}
+
+if [[ $1 == "--handler" ]]; then
+  controls=( ${2//:/$IFS} )
+  # bypass handler if controls are not (CRITICAL|OK)
+  [[ ${controls[0]} != CRITICAL && ${controls[0]} != OK ]] && exit 0
+fi
+
+[[ $UID != 0 ]] && exec sudo $0 "$@"
+
+trap onExit EXIT
+
+main "$@"
+
+exit $?
+
+

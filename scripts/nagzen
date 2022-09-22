@@ -1,0 +1,332 @@
+#!/bin/bash
+#
+# Copyright: 2021 ZENETYS
+# Author: Benoit DOLEZ <bdolez@zenetys.com>
+# License: MIT License (http://opensource.org/licenses/MIT)
+# Version: 0.1
+#
+
+[[ $XDEBUG == 1 ]] && set -x
+
+export LC_ALL=C
+shopt -s nullglob
+set -o pipefail
+set -f
+
+PROGNAME=${0##*/}
+USAGE="${PROGNAME} [OPTIONS] {-f FILENAME|ACTION ...}"
+
+function info() {
+    local i;
+    local d=$(date +%Y-%m-%dT%H:%M:%S.%3N%z);
+    local l=info
+    [[ ${1:0:2} == -- ]] && l=${1:2} && shift
+    for i in "$@"; do
+        printf '%s%s%s: %s\n' "${C[$l]}" "${l^^}" "${C[reset]}" "$i" >&2
+    done
+}
+
+function fatal() {
+    local usage=0
+    [[ $1 == --usage ]] && usage=1 && shift
+    info --${FUNCNAME[0]} "$@"
+    (( $usage )) && usage
+    trap "" EXIT
+    exit 127
+}
+
+function error() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function warning() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function debug() {
+    local debug=0
+
+    [[ ${1:0:1} == - ]] && debug=${1:1} && shift
+    (( DEBUG < $debug )) && return 0
+    info --${FUNCNAME[0]} "$@"
+}
+
+function usage() {
+  local IFS=$'\t'
+  exec >&2
+  if [[ $0 == "-bash" ]] ; then return 1 ; fi
+  [[ $# -gt 0 ]] && echo "ERROR: $*"
+  version
+  echo "Usage: $USAGE"
+  echo "Options:"
+  sed -nr "s/^[[:space:]]*## ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %-20s %s\n" "$OPT" "$DESC"
+    done
+  echo
+  
+  echo "<ACTION> is one of :"
+  sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %s\n     %s\n" "$OPT" "$DESC"
+    done
+  echo
+
+  return 0
+}
+
+function version() {
+  local PROGFILE=$0
+  local VERSION=$(sed -n 's/^# Version: //p' $PROGFILE)
+  local AUTHOR=$(sed -n 's/^# Author: //p' $PROGFILE)
+  local LICENSE=$(sed -n 's/^# License: //p' $PROGFILE)
+
+  echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
+}
+
+function build_key() {
+  local __v __k
+ 
+  [[ $1 == -v ]] && __k=$2 __v=$3 || __k=REPLY __v=$1
+  
+  __v=${__v//[^0-9a-zA-Z:_-]/_}
+  printf -v $__k "%s" "$__v"
+}
+
+function dump_nagios_object() {
+  local type=$1; shift
+  local attr value use name
+  local -A defined=()
+  local -a already=()
+
+  echo "define $type {"
+  for field in "$@"; do
+    attr="${field%%=*}"
+    value="${field#*=}"
+    
+    # save *_name value for diag
+    [[ -z $name && ${attr#*_} == "name" ]] && name=${value}
+    # key-transform 'parents' attr
+    # FIXME: do not support multiple parents
+    [[ $attr == "parents" ]] && build_key -v value "$value"
+    
+    if [[ ${attr} == "use" ]]; then
+      use="${use:+$use,}${value}"
+    elif [[ -z ${defined[${attr}]} ]]; then
+      defined[${attr}]=1
+      printf "  %-20s %s\n" "${attr}" "${value}"
+    else
+      already+=( ${attr} )
+    fi
+  done
+  for attr in "${already[@]}"; do
+    debug -2 "'$attr' for $type '$name' multiple definition, keep first"
+  done
+  if [[ $use ]]; then
+    printf "  %-20s %s\n" "use" "$use"
+  fi
+  echo "}"
+}
+
+# X-ACTION addHost NAME [ATTRS]: add host with attributs
+function addHost() {
+  fatal not-implemented
+}
+
+function host() {
+  debug -5 "$FUNCNAME $*"
+  local use=${1#*:} && [[ $use = $1 ]] && unset use
+  local dname=${1%%:*}; shift
+  local attrs=( )
+
+  if [[ $CURRENT_HOST ]]; then
+    host-end
+  fi
+
+  build_key -v use "${use:+_${use,,}}"
+  build_key -v hostid "$dname"
+
+  [[ ${1} == --template ]] && hostid="_${hostid,,}"
+
+  CURRENT_HOST="$hostid"
+  HOST_TEMPLATE[$CURRENT_HOST]="$use"
+  HOST_FULLNAME[$CURRENT_HOST]="$dname"
+  
+  if [[ ${HOSTS[$CURRENT_HOST]} == 1 ]]; then
+    fatal "duplicate host ${HOST_FULLNAME[$CURRENT_HOST]}"
+  elif [[ ${1} == --template ]]; then
+    IS_HOST_TEMPLATE=1
+    attrs=(
+      register=0
+      name="$hostid"
+      use="${use:-$DEFAULT_HOST_TEMPLATE}"
+    )
+    shift
+  elif [[ ${1:0:10} == --address= ]]; then
+    IS_HOST_TEMPLATE=0
+    attrs=(
+      host_name="$hostid"
+      display_name="$dname"
+      address="${1:10}"
+      use="${use:-$DEFAULT_HOST_TEMPLATE}"
+    )
+    shift
+  else
+    fatal "bad parameter $1, bypass"
+  fi
+
+  HOSTS[$CURRENT_HOST]=1
+
+  echo "#### $hostid${use:+:$use} ####"
+  dump_nagios_object host "$@" "${attrs[@]}"
+}
+
+function host-end() {
+  if [[ $CURRENT_HOST ]]; then
+    if [[ ${HOST_TEMPLATE[$CURRENT_HOST]} ]]; then
+      local use=${HOST_TEMPLATE[$CURRENT_HOST]}
+      local -A services
+
+      # load already declared services
+      for service in ${HOST_SERVICES[$CURRENT_HOST]}; do
+        services[$service]=1
+      done
+
+      # mark disabled services
+      for service in ${DISABLED[$CURRENT_HOST]}; do
+        services[$service]=1
+      done
+
+      # declare others services
+      for service in ${HOST_SERVICES[$use]}; do
+        [[ ${services[$service]} ]] && continue
+        host-service ${service}:${use}:${service}
+      done
+    fi
+  fi
+  echo
+
+  unset CURRENT_HOST
+  unset IS_HOST_TEMPLATE
+}
+
+function host-service() {
+  debug -5 "$FUNCNAME $*"
+  local use=${1#*:} && [[ $use = $1 ]] && unset use
+  local dname=${1%%:*}; shift
+  local attrs=( )
+
+  if [[ ${1:0:7} == "--host=" ]]; then
+    local CURRENT_HOST
+    local IS_HOST_TEMPLATE=0
+    build_key -v CURRENT_HOST "${1:7}"
+    shift
+  fi
+
+  build_key -v desc "${dname,,}"
+  build_key -v use "${use,,}"
+
+  if [[ $1 == --template ]]; then
+    shift
+    attrs=(
+      register=0
+      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
+      name="$desc"
+    )
+    SERVICES[$desc]="$desc"
+  elif [[ $1 == --disable ]]; then
+    DISABLED[$CURRENT_HOST]+="$dname$IFS"
+    return 0
+  elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
+    attrs=(
+      register=0
+      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
+      name="$CURRENT_HOST:$desc"
+      display_name="$dname"
+    )
+    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
+    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
+  elif [[ $IS_HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
+    if [[ ${SERVICES[$CURRENT_HOST:$desc]} == 1 ]]; then
+      fatal "duplicate service $dname for host ${HOST_FULLNAME[$CURRENT_HOST]}"
+    fi
+    attrs=(
+      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
+      service_description="${dname//[^A-Za-z0-9:_-]/_}"
+      display_name="$dname"
+      host_name=$CURRENT_HOST
+    )
+    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
+    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
+  else
+    warning "ignore service declaration out of context nor template"
+    return 1
+  fi
+
+  dump_nagios_object service "$@" "${attrs[@]}"
+}
+
+function service() {
+  host-service "$@"
+}
+
+declare DEFAULT_HOST_TEMPLATE=generic-host
+declare DEFAULT_SERVICE_TEMPLATE=generic-service
+
+declare VERBOSE=${VERBOSE:-1}
+declare XDEBUG=${XDEBUG:-0}
+declare -a ARGS=( )
+declare -A HOSTS=( )
+declare -A SERVICES=( )
+declare -A DISABLED=( )
+declare -A HOST_SERVICES=( )
+declare -A HOST_TEMPLATE=( )
+declare -A HOST_FULLNAME=( )
+declare IS_HOST_TEMPLATE
+
+# set
+
+trap host-end EXIT
+
+(( ${#BASH_SOURCE[@]} > 1 )) && return
+
+while (( $# > 0 )); do
+  case "$1" in
+    ## -h, --help: This help
+    -h|--help) usage && exit 0 ;;
+    ## -V, --version: Show version
+    -V|--version) version && exit 0 ;;
+    ## --x-debug: Enable bash debug mode
+    --x-debug)    XDEBUG=1 ;;
+    ## -v, --verbose: Define verbose level (must be repeat)
+    -v|--verbose) ((VERBOSE++)) ;;
+    ## -q, --quiet: Set verbose level to 0
+    -q|--quiet) ((VERBOSE=0)) ;;
+    ## -f, --source: Filename to source, or stdin if last argument
+    -f|--source) SOURCE=$2; shift;;
+    -*) usage "Unknown parameter '$1'" && exit 1 ;;
+    *) ARGS+=( "$1" ) ;;
+  esac
+  shift
+done
+
+[[ $XDEBUG == 1 ]] && set -x
+
+####################################################
+## main program starts here
+####################################################
+
+[[ $SOURCE == - ]] && SOURCE=/dev/stdin
+
+[[ -r $SOURCE ]] && source $SOURCE && exit $?
+
+[[ -z ${ARGS[@]} ]] &&
+  fatal --usage "need ACTION"
+
+ACTION=${ARGS[0]}; ARGS=( ${ARGS[@]:1} )
+
+declare -f do_$ACTION > /dev/null ||
+  fatal "undefine action '$ACTION'"
+
+
+

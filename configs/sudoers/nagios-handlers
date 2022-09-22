@@ -1,0 +1,1 @@
+nagios ALL=(ALL) NOPASSWD: /opt/nag4you/scripts/update-snmpuser-entry

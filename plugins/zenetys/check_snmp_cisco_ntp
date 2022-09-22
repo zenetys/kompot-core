@@ -1,0 +1,197 @@
+#!/bin/bash
+#
+##
+## Copyright (c) 2018-2021 Benoit DOLEZ - License MIT
+##
+## Permission is hereby granted, free of charge, to any person obtaining
+## a copy of this software and associated documentation files (the
+## "Software"), to deal in the Software without restriction, including
+## without limitation the rights to use, copy, modify, merge, publish,
+## distribute, sublicense, and/or sell copies of the Software, and to
+## permit persons to whom the Software is furnished to do so, subject to
+## the following conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+## OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+## WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+## Author: Benoit DOLEZ <bdolez@ant-computing.com>
+## Author: Benoit DOLEZ <bdolez@zenetys.com>
+## Version: 1.0
+## Description: oid monitoring
+##
+#
+
+function usage() {
+  echo "Usage: ${0##*/} ..."
+  echo "  -h, --help: this help"
+}
+
+function pexit() {
+  local code=3
+  if [[ ${1:0:1} == - ]]; then
+    code=${1:1}
+    shift
+  fi
+  printf "$1\n" "${@:2}"
+  exit $code
+}
+
+function in_range() {
+  local value=$1; shift
+  local range=$1; shift
+  local complement=0
+  local start end
+
+  if [[ ${range:0:1} == "@" ]]; then
+    complement=1
+    range="${range:1}"
+  fi
+  case $range in
+    *[0-9]:[0-9]*) start=${range%:*}; end=${range#*:} ;;
+    *[0-9]:) start=${range%:} ;;
+    ~:[0-9]*) start=${range#*:} ;;
+    *) start=0; end=${range} ;;
+  esac
+  
+  [[ $start && -z ${start//[0-9]} ]] || pexit -3 "bad start in range '$range'"  
+  [[ $end   && -z ${end//[0-9]}   ]] || pexit -3 "bad end in range '$range'"
+  
+  if ((complement == 0)); then 
+    if (( $start && $end )); then
+      (( $start <= $value && $value <= $end )) && return 0
+      (( $value < $start )) && REPLY=$start
+      (( $end < $value )) && REPLY=$end
+    elif (( $start )); then
+      (( $start <= $value )) && return 0
+      REPLY=$start
+    elif (( $end )); then
+      (( $value <= $end )) && return 0
+      REPLY=$end
+    fi
+  else
+    if (( $start && $end )); then
+      (( $value <= $start || $end <= $value )) && return 0
+      REPLY=$start
+    elif (( $start )); then
+      (( $value <= $start )) && return 0
+      REPLY=$start
+    elif (( $end )); then
+      (( $end <= $value )) && return 0
+      REPLY=$end
+    fi
+  fi
+  return 1
+}
+
+function onError() {
+  echo "SNMP-NTP-DATE UNKNOWN: $REPLY"
+  exit 3
+}
+
+shopt -s extglob
+set -e
+declare -a ARGS=( )
+declare VERBOSE=0
+
+declare PROTOCOL=3
+declare USERNAME=""
+declare HOSTNAME=""
+
+while (( $# > 0 )); do
+  case "$1" in
+    ## -h, --help: this help
+    -h|--help) usage && exit 0 ;;
+    ## --x-debug: enable bash debug mode
+    --x-debug) XDEBUG=1 ;;
+    ## -v, --verbose: verbose mode
+    -v|--verbose) VERBOSE=1 ;;
+    ## -V, --version: print version information
+    -V|--version) usage && exit 0 ;;
+    ## -H, --hostname: define hostname
+    -H|--hostname) HOSTNAME=$2; shift;;
+    ## -p, --port PORT: Port number (default: 161)
+    -p|--port) PORT=$2; shift;;
+    ## -P, --protocol [1|2c|3]: SNMP protocol version
+    -P|--protocol) PROTOCOL=$2; shift;;
+    ## -L, --seclevel noAuthNoPriv|authNoPriv|authPriv: SNMPv3 securityLevel
+    -L|--seclevel) SECLEVEL=$2; shift;;
+    ## -a, --authproto PROTO: SNMPv3 auth proto
+    -a|--authproto) AUTHPROTO=$2; shift;;
+    ## -x, --privproto PROTO: SNMPv3 priv proto
+    -x|--privproto) PRIVPROTO=$2; shift;;
+    ## -C, --community COMMUNITY: Optional community string
+    -C|--community) COMMUNITY=$2; shift;;
+    ## -U, --secname NAME: SNMPv3 username
+    -U|--secname) USERNAME=$2; shift;;
+    ## -A, --authpassword PASS: SNMPv3 authentication password
+    -A|--authpassword) AUTHPASS=$2; shift;;
+    ## -X, --privpassword PASS: SNMPv3 privacy password
+    -X|--privpassword) PRIVPASS=$2; shift;;
+
+    --mode) MODE=$2; shift;;
+
+    --critical) CRITICAL=$2; shift;;
+        
+    ## ignore others arguments
+    --) break ;;
+    ## store unknown args
+    *) fatal "unknown parameter '$1'" && usage >&2 && exit 1 ;;
+  esac
+  shift
+done
+
+trap onError ERR
+
+[[ $XDEBUG ]] && set -x
+
+[[ -z $HOSTNAME ]] && fatal "undefined hostname (-H)"
+
+cntpSysClock=.1.3.6.1.4.1.9.9.168.1.1.10
+
+OIDS=( $cntpSysClock )
+
+[[ ${#OIDS[@]} == 0 ]] && fatal "missing object oids (-o)"
+
+SNMPARGS=(
+  -v "$PROTOCOL"
+  ${COMMUNITY:+-c "$COMMUNITY"}
+  ${USERNAME:+-u "$USERNAME"}
+  ${AUTHPASS:+-a "$AUTHPROTO" -A "$AUTHPASS"}
+  ${PRIVPASS:+-x "$PRIVPROTO" -X "$PRIVPASS"}
+  ${SECLEVEL:+-l $SECLEVEL}
+  -Onqxv
+)
+
+[[ -z ${OIDS[*]//[0-9.]} ]] && SNMPARGS+=( -m '' -M '' )
+
+REPLY=$(snmpwalk "${SNMPARGS[@]}" "${HOSTNAME}" "${OIDS[@]}" 2>&1)
+RET=$?
+
+if [[ ${REPLY:0:1} != '"' ]]; then
+  pexit -3 "SNMP UNKNOWN: %s" "$REPLY"
+fi
+
+IFS=$'" '
+VALUES=( $REPLY )
+
+IFS=''
+remote=$(date -d "1900-01-01+$((16#${VALUES[*]:1:4}))sec" +%s)
+local=$(date +%s)
+
+if (( $CRITICAL && $local-$CRITICAL <= $remote && $remote <= $local+$CRITICAL )); then
+  pexit -0 "SNMP-NTP-DATE OK: $(date -d "@$remote" +"%Y-%m-%d %H:%M:%S")"
+else
+  pexit -2 "SNMP-NTP-DATE CRITICAL: $(date -d "@$remote" +"%Y-%m-%d %H:%M:%S")"
+fi
+
+exit 3
+
+

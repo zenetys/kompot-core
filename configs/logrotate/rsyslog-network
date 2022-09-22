@@ -1,0 +1,15 @@
+/var/log/network.log
+{
+          rotate 15
+          daily
+          olddir archives
+          createolddir 750 root adm
+          dateext
+          missingok
+          compress
+          nodelaycompress
+          sharedscripts
+          postrotate
+                    /usr/lib/rsyslog/rsyslog-rotate
+          endscript
+}

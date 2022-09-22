@@ -1,0 +1,14 @@
+# cat /etc/systemd/system/console.service
+[Unit]
+Description=Nagios Console
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+ExecStart=/opt/nag4you/scripts/start_console.sh
+
+[Install]
+WantedBy=multi-user.target
+

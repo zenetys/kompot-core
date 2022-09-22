@@ -1,0 +1,14 @@
+/var/log/logmatch.log
+{
+          rotate 31
+          daily
+          olddir archives
+          dateext
+          missingok
+          compress
+          delaycompress
+          sharedscripts
+          postrotate
+                    killall logmatch
+          endscript
+}

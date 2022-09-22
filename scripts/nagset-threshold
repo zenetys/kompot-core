@@ -1,0 +1,22 @@
+#!/bin/bash
+
+function nagset-threshold() {
+  local host=$1; shift
+  local service=$1; shift
+  local warn=$1; shift
+  local crit=$1; shift
+
+  if nagcc "$host" "$service" > /dev/null; then
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_WARNING;$warn" >> /var/lib/nagios4/rw/nagios.cmd
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_CRITICAL;$crit" >> /var/lib/nagios4/rw/nagios.cmd
+    echo OK >&2
+  fi
+  exit 1
+}
+
+if [[ $# -lt 4 ]]; then
+  echo "Usage: ${0##*/} host service warn crit" >&2
+  exit 1
+fi
+
+nagset-threshold "$@"

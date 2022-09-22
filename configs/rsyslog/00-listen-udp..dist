@@ -1,0 +1,2 @@
+module(load="imudp")
+input(type="imudp" port="514" name="net-bsd" rcvbufsize="16777216")

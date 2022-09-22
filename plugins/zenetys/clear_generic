@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+##
+## Copyright (c) 2018-2019 Benoit DOLEZ - License MIT
+##
+## Permission is hereby granted, free of charge, to any person obtaining
+## a copy of this software and associated documentation files (the
+## "Software"), to deal in the Software without restriction, including
+## without limitation the rights to use, copy, modify, merge, publish,
+## distribute, sublicense, and/or sell copies of the Software, and to
+## permit persons to whom the Software is furnished to do so, subject to
+## the following conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+## OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+## WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+## Author: Benoit DOLEZ <bdolez@ant-computing.com>
+## Author: Benoit DOLEZ <bdolez@zenetys.com>
+## Version: 1.0
+## Description: generic clear-cache wrapper for nagios-cc
+##
+#
+
+function fatal() {
+  echo "CLEAR-GENERIC UNKNOWN: $*"
+  exit 3
+}
+
+function usage() {
+  echo "Usage: ${0##*/} -H HOST [-S SERVICE] ..."
+  echo "  -h, --help: this help"
+}
+
+function onError() {
+  echo "${BASH_SOURCE[1]}:${BASH_LINENO[0]} in ${FUNCNAME[1]}: ERROR" >&2
+}
+
+shopt -s extglob
+set -e
+declare -a ARGS=( )
+declare VERBOSE=0
+
+while (( $# > 0 )); do
+  case "$1" in
+    ## -h, --help: this help
+    -h|--help) usage >&2 && exit 0 ;;
+    ## --x-debug: enable bash debug mode
+    --x-debug) XDEBUG=1 ;;
+    ## -v, --verbose: verbose mode
+    -v|--verbose) VERBOSE=1 ;;
+    ## -H, --host: define hostname
+    -H|--host) HOST=$2; shift;;
+    ## -S, --service: define service
+    -S|--service) SVC=$2; shift;;
+    ## --clear 0|...: need to clear
+    --clear) CLEAR=$2; shift;;
+    ## ignore others arguments
+    --) shift; break ;;
+    ## store unknown args
+    -*) fatal "unknown parameter '$1'" && usage >&2 && exit 1 ;;
+    *)  break;; 
+  esac
+  shift
+done
+
+ARGS+=( "$@" )
+
+trap onError ERR
+
+[[ $XDEBUG ]] && set -x
+
+if [[ $CLEAR != 0 && $NAGIOS_EXTERNAL_COMMAND_FILE ]]; then
+  if [[ $SVC ]]; then
+    # remove CLEAR FLAG using nagios command
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$HOST;$SVC;_CLEAR_CACHE;0" \
+      >> $NAGIOS_EXTERNAL_COMMAND_FILE
+  else
+    # remove CLEAR FLAG using nagios command
+    echo "[$(date +%s)] CHANGE_CUSTOM_HOST_VAR;$HOST;_CLEAR_CACHE;0" \
+      >> $NAGIOS_EXTERNAL_COMMAND_FILE
+  fi
+fi
+
+CLEAR_CACHE=$CLEAR exec "$@"
+

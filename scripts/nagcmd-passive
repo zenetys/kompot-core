@@ -1,0 +1,25 @@
+#!/bin/bash
+
+NAGIOS_EXTERNAL_COMMAND_FILE=${NAGIOS_EXTERNAL_COMMAND_FILE:-/var/lib/nagios4/rw/nagios.cmd}
+declare -A STATES=( 
+ [0]=0 [1]=1 [2]=2 [3]=3
+ [OK]=0 [WARNING]=1 [CRITICAL]=2 [UNKNOWN]=3
+ [UP]=0 [DOWN]=1 [UNREACHABLE]=2
+)
+
+HST=$1
+SVC=$2
+STATE=${STATES[${3:-0}]}
+MSG=$4
+
+if [[ -z $HST ]]; then
+  echo "ERROR: no host" >&2
+  exit 3
+fi
+
+if [[ -e $NAGIOS_EXTERNAL_COMMAND_FILE ]]; then
+  echo "[$(date +%s)] PROCESS_SERVICE_CHECK_RESULT;$HST${SVC:+;$SVC};${STATE:-0};${MSG:-OK}" >> $NAGIOS_EXTERNAL_COMMAND_FILE
+else
+  echo "ERROR" >&2
+  exit 3
+fi

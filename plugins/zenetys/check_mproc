@@ -1,0 +1,32 @@
+#!/bin/bash
+
+STATUS[0]="OK"
+STATUS[1]="WARNING"
+STATUS[2]="CRITICAL"
+STATUS[3]="UNKNOWN"
+
+IFS=$'\t'
+errors=( )
+exit_status=0
+
+for name in ${NAMES//,/$IFS}; do
+  "$@" --process-name="^${name}\$" >&2
+  exit_proc=$?
+  (( $exit_proc == 2 && $exit_status != 2 )) && exit_status=2
+  (( $exit_proc == 3 && $exit_status <= 1 )) && exit_status=3
+  (( $exit_proc == 1 && $exit_status == 0 )) && exit_status=1
+  if (( $exit_proc != 0 )); then
+    errors+=( "$name" )
+  fi
+done
+
+if (( $exit_status != 0 )); then
+  IFS=' '
+  echo "${STATUS[$exit_status]}: No process: ${errors[*]}"
+else
+  echo "${STATUS[$exit_status]}: All processes found"
+fi
+
+echo 
+
+exit $exit_status

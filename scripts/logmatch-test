@@ -1,0 +1,62 @@
+#!/bin/bash
+
+function log2lm() {
+  sed -nre 's@^([^/]+)/([^ ]+) ([^.]+)\.([^ ]+) ([^ ]+) ([^:[]+)(\[[^:]*\])?:? (.*)@\1\t\2\t\3\t\4\t\5\t\5\t\6\t\8@p'
+}
+
+function logmatch() {
+  local output=$1
+  $BIN -v CONFIG=$CONFIG -v ALIASES=$ALIASES \
+     -v DEBUG=5 -v NAGIOS_EXTERNAL_COMMAND_FILE=$output
+}
+
+BIN=${LOGMATCH_BIN:-${0%-test}}
+CONFIG=${CONFIG:-logmatch.conf}
+ALIASES=${ALIASES:-aliases.conf}
+TEMP=$(mktemp)
+TEST=0
+ERROR=0
+OK=0
+RED='\033[0;31m'
+RESET='\033[0m'
+GREEN='\033[0;32m'
+
+while read -r; do
+    ((TEST++))
+
+    echo "${RAWLOG}" | log2lm | logmatch $TEMP 2>logmatch.debug > /dev/null
+    OUTPUT=$(cut -f2- -d";" < $TEMP)
+    echo -n > $TEMP
+
+    # non empty response
+    if [[ ${REPLY:0:2} == "# " ]]; then
+      if [[ $OUTPUT != "${REPLY:2}" ]]; then
+        # echo "$RAWLOG"
+        echo -e "=> ${RED}ERROR${RESET} (${OUTPUT//\\/\\\\})"
+        ((ERROR++))
+      else
+        # echo "$RAWLOG"
+        echo -e "=> ${GREEN}OK${RESET} (${OUTPUT//\\/\\\\})"
+        ((OK++))
+      fi
+      RAWLOG=""
+    else
+      if [[ $OUTPUT != "" ]]; then
+        # echo "$RAWLOG"
+        echo -e "=> ${RED}ERROR${RESET} (${OUTPUT//\\/\\\\})"
+        ((ERROR++))
+      # else
+      #   echo "$RAWLOG"
+      #   echo -e "=> ${GREEN}OK${RESET} (${OUTPUT//\\/\\\\})"
+      #   ((OK++))
+      fi
+      RAWLOG="$REPLY"
+    fi
+done < <(cat ; echo '# ')
+
+echo "error: $ERROR, ok: $OK, match: $((ERROR+OK)), total: $TEST"
+[[ $ERROR != 0 ]] && exit 1
+exit 0
+
+
+

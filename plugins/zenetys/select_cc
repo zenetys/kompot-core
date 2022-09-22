@@ -1,0 +1,15 @@
+#!/bin/bash
+
+ID=$1; shift
+
+for ((i=0; i<=ID; i++)); do
+  CMD=( )
+  while (( $# > 0 )); do
+    [[ $1 == -- ]] && break
+    CMD+=( "$1" )
+    shift
+  done
+  shift
+done
+
+exec "${CMD[@]}"

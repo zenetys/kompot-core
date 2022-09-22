@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+##
+## Copyright (c) 2018-2019 Benoit DOLEZ - License MIT
+##
+## Permission is hereby granted, free of charge, to any person obtaining
+## a copy of this software and associated documentation files (the
+## "Software"), to deal in the Software without restriction, including
+## without limitation the rights to use, copy, modify, merge, publish,
+## distribute, sublicense, and/or sell copies of the Software, and to
+## permit persons to whom the Software is furnished to do so, subject to
+## the following conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+## OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+## WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+## Author: Benoit DOLEZ <bdolez@ant-computing.com>
+## Author: Benoit DOLEZ <bdolez@zenetys.com>
+## Version: 1.0
+## Description: generic check_diff nagios plugin
+##
+#
+
+[[ $XDEBUG ]] && set -x
+
+function onERROR() {
+  echo "DIFF UNKNOWN"
+  exit 3
+}
+
+trap onERROR ERR
+set -e
+
+IFS="_"
+CACHEDIR=${CACHEDIR:-/var/lib/nagios4/plugins-cache/${0##*/}}
+SHASUM=( $(echo -n "$*" | sha1sum) )
+#CACHEFILE="${CACHEFILE:-${CACHEDIR%/}/${SHASUM[0]}}"
+CACHEFILE="${CACHEFILE:-${CACHEDIR%/}/${SHASUM%% *}}"
+# reset cache if CLEAR_CACHE environement variable set
+#[[ $CLEAR_CACHE != 0 ]] && rm -f "$CACHEFILE" && exit 0
+[[ -n $CLEAR_CACHE && $CLEAR_CACHE != 0 ]] && rm -f "$CACHEFILE"
+[[ -r $CACHEFILE ]] && CACHED=$(<"$CACHEFILE")
+set +e
+trap "" ERR
+OUTPUT=$("$@")
+RET=$?
+OUTPUT="${OUTPUT//$'\r'}"
+[[ $RET != 0 ]] && echo "$OUTPUT" && exit $RET
+[[ "${OUTPUT%%|*}" == "$CACHED" ]] && echo "$OUTPUT" && exit $RET
+if [[ -z $CACHED ]]; then
+  mkdir -p "${CACHEDIR}"
+  echo "${OUTPUT%%|*}" > "$CACHEFILE"
+  echo "DIFF OK: initialize with '${OUTPUT%%|*}'"
+  exit 0
+fi
+
+echo "DIFF CRITICAL: '${OUTPUT%%|*}' differs from old value '${CACHED}'"
+exit 2
+

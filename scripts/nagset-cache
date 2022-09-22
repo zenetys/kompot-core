@@ -1,0 +1,27 @@
+#!/bin/bash
+
+function fatal() {
+  echo "[FATAL]: $*"
+  exit 1
+}
+
+function nagset-cache() {
+  local host=$1; shift
+  local service=$1; shift
+  local value=$1; shift
+
+  eval local a=( $(nagcc "$host" "$service" | tail -1) )
+  [[ ${#a[@]} == 0 ]] && exit 1
+  eval local s=( $(IFS="_" ; echo -n "${a[*]:10}" | sha1sum) )
+  [[ ${#s[@]} == 0 ]] && fatal "can't find cache"
+  echo "$value" > /var/lib/nagios4/plugins-cache/check_diff/${s[0]}
+  [[ $? != 0 ]] && fatal "bad cache id '${s[0]}'"
+  echo OK >&2
+}
+
+if [[ $# != 3 ]]; then
+  echo "Usage: ${0##*/} host service value" >&2
+  exit 1
+fi
+
+nagset-cache "$@"

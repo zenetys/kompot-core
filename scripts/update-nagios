@@ -1,0 +1,306 @@
+#!/bin/bash
+#
+# Copyright: 2021 ZENETYS
+# Author: Benoit DOLEZ <bdolez@zenetys.com>
+# License: MIT License (http://opensource.org/licenses/MIT)
+# Version: 0.1
+#
+
+[[ $XDEBUG == 1 ]] && set -x
+
+export LC_ALL=C
+shopt -s nullglob
+set -o pipefail
+set -f
+
+PROGNAME=${0##*/}
+USAGE="${PROGNAME} [OPTIONS] ACTION ..."
+
+function info() {
+    local i;
+    local d=$(date +%Y-%m-%dT%H:%M:%S.%3N%z);
+    local l=info
+    [[ ${1:0:2} == -- ]] && l=${1:2} && shift
+    for i in "$@"; do
+        printf '%s%s%s: %s\n' "${C[$l]}" "${l^^}" "${C[reset]}" "$i" >&2
+    done
+}
+
+function fatal() {
+    local usage=0
+    [[ $1 == --usage ]] && usage=1 && shift
+    info --${FUNCNAME[0]} "$@"
+    (( $usage )) && usage
+    trap "" EXIT
+    exit 127
+}
+
+function error() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function warning() {
+    info --${FUNCNAME[0]} "$@"
+}
+
+function debug() {
+    local debug=0
+
+    [[ ${1:0:1} == - ]] && debug=${1:1} && shift
+    (( DEBUG < $debug )) && return 0
+    info --${FUNCNAME[0]} "$@"
+}
+
+function usage() {
+  local IFS=$'\t'
+  exec >&2
+  if [[ $0 == "-bash" ]] ; then return 1 ; fi
+  [[ $# -gt 0 ]] && echo "ERROR: $*"
+  version
+  echo "Usage: $USAGE"
+  echo "Options:"
+  sed -nr "s/^[[:space:]]*## ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %-20s %s\n" "$OPT" "$DESC"
+    done
+  echo
+  
+  echo "<ACTION> is one of :"
+  sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
+    while read OPT DESC ; do
+      printf " %s\n     %s\n" "$OPT" "$DESC"
+    done
+  echo
+
+  return 0
+}
+
+function version() {
+  local PROGFILE=$0
+  local VERSION=$(sed -n 's/^# Version: //p' $PROGFILE)
+  local AUTHOR=$(sed -n 's/^# Author: //p' $PROGFILE)
+  local LICENSE=$(sed -n 's/^# License: //p' $PROGFILE)
+
+  echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
+}
+
+# X-ACTION build <filename.xls>: build config with input filename.xls
+function do_build() {
+  local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
+
+  mkdir -p $cfgdir
+  debug "Create new Nagios conf.d to '$cfgdir'"
+  
+  # convert xls to csv
+  # - lines starting by # are ignored
+  # - separator is ',' (coma)
+  # - ignore double quotes as field separator
+
+  # Source nagzen script with functions to manage centreon objects
+  source ${0%/*}/nagzen
+
+  for file in "$@"; do
+    debug -3 "Compiling '$file'"
+    if [[ ${file} =~ .*\.cfg$ ]]; then
+      local temp=$(mktemp)
+      tr -d '\r' < $file > $temp
+      source $temp > $cfgdir/00_${file##*/} ||
+        { rm -f $temp; fatal "source $file returns code $?"; }
+      rm -f $temp
+      host-end >> $cfgdir/00_${file##*/} ||
+        fatal "host-end() returns code $?"
+    elif [[ ${file} =~ .*\.xls$ ]]; then
+      while read -r ; do
+        unset "${headers[@]}"; eval "$REPLY"; [[ $row ]] || continue
+
+        if [[ $equipement && $type && -z $interface ]] ; then
+
+          debug -3 "HOST LINE : <$equipement> <$adresse> <$type> <$authentification>/<$secname,$authpassword,$privpassword> <$parent> <$alias> ####"
+          debug "host($equipement,$type)"
+
+          unset autocred useauth
+          if [[ $secname || $authpassword || $privpassword ]]; then
+            autocred=$(credentials list | grep "^_auto_cred_$equipement$")
+            if [[ $autocred ]]; then
+              info "Remove old credential for $equipement"
+              credentials del -- "_auto_cred_$equipement"
+            fi
+            info "Adding credential for $equipement"
+            credentials add -- "_auto_cred_$equipement" snmpv3 ${secname:+-u $secname} ${authpassword:+-A $authpassword} ${privpassword:+-X $privpassword}
+            autocred="_auto_cred_$equipement"
+            useauth=_${autocred}${authentification:+,_$authentification}
+          else
+            useauth=${authentification:+,_$authentification}
+          fi
+
+          PARAMS=(
+            ${equipement}:"${type}"
+            --address="${adresse:-$equipement}"
+            ${useauth:+use="${useauth}"}
+            ${parent:+parents="${parent}"}
+          )
+          host "${PARAMS[@]}" > $cfgdir/$equipement.cfg ||
+            fatal "host() returns code $?"
+        
+#          if [[ ${SERVICES[${HOST_TEMPLATE[$CURRENT_HOST]}:if-generic]} ]]; then
+#            service IF-GENERIC:${HOST_TEMPLATE[$CURRENT_HOST]}:if-generic name=$equipement:if-generic register=0 >> $cfgdir/$equipement.cfg ||
+#              fatal "service(IF-GENERIC) returns code $?"
+#          fi
+
+          host-end >> $cfgdir/$equipement.cfg ||
+            fatal "host-end() returns code $?"
+
+        elif [[ $equipement && $interface ]]; then
+
+          debug -3 "INTERFACE LINE : <$equipement> <$interface> <$status> <$description> <$type> ####"
+          debug "interface($equipement,$interface,$type)"
+
+          [[ -z $status ]] && status="up"
+
+          case "${type,,}" in
+            "network"|*)
+
+              case "${status,,}" in
+                down|down/down) status_admin=down ; status_oper=down ;;
+                up/down) status_admin=up ; status_oper=down ;;
+                *) status_admin=up ; status_oper=up ;;
+              esac
+
+              PARAMS=(
+                "ETAT-ADM-IF-${interface}"
+                --host="${equipement}"
+                check_command="check_snmp_interface_adm"
+                display_name=ETAT-ADM-IF-${description:-$interface}
+                __IFACE="$interface"
+                __STATUS_ADMIN="${status_admin,,}"
+                __STATUS_OPER="${status_oper,,}"
+              )
+              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
+                fatal "service() returns code $?"
+
+              PARAMS=(
+                "ETAT-OPER-IF-${interface}"
+                --host="${equipement}"
+                check_command="check_snmp_interface_oper"
+                display_name=ETAT-OPER-IF-${description:-$interface}
+                __IFACE="$interface"
+                __STATUS_ADMIN="${status_admin,,}"
+                __STATUS_OPER="${status_oper,,}"
+              )
+              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
+                fatal "service() returns code $?"
+
+              ;;
+
+          esac
+
+        fi
+
+      done < <(xls2bash "$file" --detect-headers --ignore-comments | iconv -f cp1252 -t utf8)
+    fi
+  done # for file
+
+  # validate link to new config
+  ln -snf ${cfgdir##*/} ${CFGDIR}/new
+}
+
+# X-ACTION apply: apply new config
+function do_apply() {
+  debug "Apply new nagios config from ${CFGDIR}/new"
+
+  [[ -L ${CFGDIR}/new ]] ||
+    fatal "bad configuration: '${CFGDIR}/new' do not link to configuration"
+  
+  [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
+  [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
+  mv ${CFGDIR}/new ${CFGDIR}/current
+  systemctl restart nagios4
+  sleep 1
+  if ! systemctl is-active -q nagios4; then
+    journalctl -n 30 --no-pager --unit nagios4.service
+    warning "Rollback to the old configuration"
+    do_revert
+    return 1
+  fi
+
+  info "New configuration applied and linked to ${CFGDIR}/current"
+
+  info "Update initial state"
+  HEADERS=host_name,service_description,has_been_checked naglive |
+    awk '{if ($3 == 0) print $1,$2}' |
+    while read; do
+      nagcmd-passive $REPLY 0 Initialisation
+    done
+}
+
+# X-ACTION revert: revert to old config
+function do_revert() {
+  debug "Revert previous configuration (${CFGDIR}/previous)"
+
+  [[ -L ${CFGDIR}/previous ]] ||
+    fatal "can't revert to unknown configuration"
+  
+  if [[ -L ${CFGDIR}/current ]]; then
+    debug "Disable current ${CFGDIR}/$(readlink ${CFGDIR}/current)"
+    [[ -L ${CFGDIR}/old ]] && rm ${CFGDIR}/old
+    mv ${CFGDIR}/current ${CFGDIR}/old
+    info "Old configuration linked to ${CFGDIR}/old"
+  fi
+
+  info "Previous configuration applied and linked to ${CFGDIR}/current"
+
+  mv ${CFGDIR}/previous ${CFGDIR}/current
+  systemctl restart nagios4 
+  sleep 1
+  if ! systemctl is-active -q nagios4; then
+    journalctl -n 30 --no-pager --unit nagios4.service
+    fatal "Rollback failed, no active configuration running"
+  fi
+}
+
+declare VERBOSE=${VERBOSE:-1}
+declare BASEDIR=${BASEDIR:-/var/lib/configs/nagios}
+declare CFGDIR=${BASEDIR}
+
+export PATH=${PATH}:${0%/*}
+
+(( ${#BASH_SOURCE[@]} > 1 )) && return
+
+while (( $# > 0 )); do
+  case "$1" in
+    ## -h, --help: This help
+    -h|--help) usage && exit 0 ;;
+    ## -V, --version: Show version
+    -V|--version) version && exit 0 ;;
+    ## --x-debug: Enable bash debug mode
+    --x-debug)    XDEBUG=1 ;;
+    ## -v, --verbose: Define verbose level (must be repeat)
+    -v|--verbose) ((VERBOSE++)) ;;
+    ## -q, --quiet: Set verbose level to 0
+    -q|--quiet) ((VERBOSE=0)) ;;
+    ## -f, --source: Filename to source, or stdin if last argument
+    -f|--source) SOURCE=$2; shift;;
+    -*) usage "Unknown parameter '$1'" && exit 1 ;;
+    *) ARGS+=( "$1" ) ;;
+  esac
+  shift
+done
+
+[[ $XDEBUG == 1 ]] && set -x
+
+####################################################
+## main program starts here
+####################################################
+
+ACTION=${ARGS[0]}
+
+case $ACTION in
+  # FIXME
+  build) do_build "${ARGS[@]:1}" ;;
+  apply) do_apply ;;
+  revert) do_revert ;;
+  *) usage "unknown command '$ACTION'" && exit 1 ;;
+esac
+
+exit $?
+

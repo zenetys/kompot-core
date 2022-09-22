@@ -1,0 +1,220 @@
+#!/bin/bash
+#
+##
+## Copyright (c) 2018-2019 Benoit DOLEZ - License MIT
+##
+## Permission is hereby granted, free of charge, to any person obtaining
+## a copy of this software and associated documentation files (the
+## "Software"), to deal in the Software without restriction, including
+## without limitation the rights to use, copy, modify, merge, publish,
+## distribute, sublicense, and/or sell copies of the Software, and to
+## permit persons to whom the Software is furnished to do so, subject to
+## the following conditions:
+##
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+##
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+## NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+## LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+## OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+## WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+## Author: Benoit DOLEZ <bdolez@ant-computing.com>
+## Author: Benoit DOLEZ <bdolez@zenetys.com>
+## Version: 1.0
+## Description: resolv nagios check_command
+##
+#
+
+shopt -s extglob
+
+function extract_nagios_block() {
+  # https://stackoverflow.com/questions/19926634/grep-a-block-of-text-delimited-by-two-key-lines
+  gawk -v HNAME=$2 -v SNAME=$3 -v CNAME=$4 '
+  BEGIN {
+    if (SNAME) {
+      start_block_pattern = "^(servicestatus|define service) {$";
+      filter_pattern = "host_name[=\t]" HNAME "$";
+      service_pattern = "service_description[=\t]" SNAME "$";
+    }
+    else if (HNAME) {
+      start_block_pattern = "^(hoststatus|define host) {$";
+      filter_pattern = "host_name[=\t]" HNAME "$";
+    }
+    else if (CNAME) {
+      start_block_pattern = "^define command {$";
+      filter_pattern = "command_name[=\t]" CNAME "$";
+    }
+  }
+  {
+    # detect block start
+    if (match($0, start_block_pattern)) p = 1;
+    # store each line
+    if (p == 1) {
+      a[NR] = $0;
+      # find pattern in block
+      if (match($0, filter_pattern)) f = 1;
+      if (match($0, service_pattern)) fs = 1;
+      # detect block end
+      if (/^\t\}$/) {
+        if (f == 1 && fs == 1) {
+          for (i in a) print a[i];
+        }
+        else if (f == 1 && !SNAME) {
+          for (i in a) print a[i];
+        }
+        p = 0; f = 0; fs = 0;
+        delete a;
+      }
+    }
+  }
+  ' $1
+}
+
+function object_to_cvars() {
+  local type=$1; shift
+  local IFS=$'\n'
+
+  # for each attributs (remove first and last block markers)
+  for line in $*; do
+    [[ ${line:0:1} != $'\t' ]] && continue
+    [[ ${#line} == 2 ]] && continue
+    line=${line:1}
+    val=${line#*[=$'\t']}
+    var=${line:0:${#line}-${#val}-1}
+    case $var in
+      host_name) var="hostname";;
+      display_name) [[ $type == HOST ]] && var="hostdisplayname" || var="servicedisplayname";;
+      service_description) var="servicedesc";;
+      _*) var="_${type}${var:1}" ; val="${val#*;}" ;;
+      *) var="${type}${var}" ; val="${val#*;}" ;;
+    esac
+    (( VERBOSE )) && echo ">> ${var^^} = <$val>" >&2
+    CVARS[${var^^}]="$val"
+  done
+}
+
+function resource_to_cvars() {
+  local filename=$1; shift
+  while read; do
+    if [[ ${REPLY:0:5} == '$USER' ]]; then
+      var=${REPLY%%=*}
+      val=${REPLY#*=}
+      (( VERBOSE )) && echo ">> ${var:1:${#var}-2} = <$val>" >&2
+      CVARS[${var:1:${#var}-2}]="$val"
+    fi
+  done < "$filename"
+}
+
+function fatal() {
+  echo "[FATAL] $*" >&2
+  exit 1
+}
+
+function usage() {
+  echo "Usage: ${0##*/} HOST [SERVICE]"
+  echo "  -h, --help: this help"
+}
+
+function onError() {
+  echo "${BASH_SOURCE[1]}:${BASH_LINENO[0]} in ${FUNCNAME[1]}: ERROR" >&2
+}
+
+declare STATUSDB=${NAGCC_STATUSDB:-/var/lib/nagios4/status.dat}
+declare OBJECTDB=${NAGCC_OBJECTDB:-/var/lib/nagios4/objects.cache}
+declare RESOURCE=${NAGCC_RESOURCE:-/etc/nagios4/resource.cfg}
+
+declare -A CVARS=( )
+declare -a ARGS=( )
+declare VERBOSE=0
+
+while (( $# > 0 )) ; do
+  case "$1" in
+    ## -h, --help: this help
+    -h|--help) usage >&2 && exit 0 ;;
+    ## --x-debug: enable bash debug mode
+    --x-debug) XDEBUG=1 ;;
+    ## -v, --verbose: verbose mode
+    -v|--verbose) VERBOSE=1 ;;
+    ## --exec: execute command
+    --exec) EXEC=1 ;;
+    ## ignore others arguments
+    --) break ;;
+    ## store unknown args
+    -*) fatal "unknown parameter '$1'" && usage >&2 && exit 1 ;;
+    *)  ARGS[${#ARGS[@]}]=$1 ;;
+  esac
+  shift
+done
+
+trap onError ERR
+
+[[ $XDEBUG ]] && set -x
+
+HNAME=${ARGS[0]}
+SNAME=${ARGS[1]}
+CNAME=${ARGS[2]}
+
+[[ $HNAME ]] || { usage && exit 1 ; }
+
+CVARS["COMMANDFILE"]="${NAGIOS_EXTERNAL_COMMAND_FILE:-/var/lib/nagios4/rw/nagios.cmd}"
+resource_to_cvars ${RESOURCE}
+
+hostdef="$(extract_nagios_block ${OBJECTDB} "$HNAME")"
+[[ -z $hostdef ]] && fatal "host '$HNAME' not found"
+object_to_cvars HOST "$hostdef"
+
+hostdef="$(extract_nagios_block ${STATUSDB} "$HNAME")"
+[[ -z $hostdef ]] && fatal "host '$HNAME' not found"
+object_to_cvars HOST "$hostdef"
+
+if [[ $SNAME ]]; then
+
+  servicedef="$(extract_nagios_block ${OBJECTDB} "$HNAME" "$SNAME")"
+  [[ -z $servicedef ]] && fatal "service '$SNAME' on '$HNAME' not found"
+  object_to_cvars SERVICE "$servicedef"
+
+  servicedef="$(extract_nagios_block ${STATUSDB} "$HNAME" "$SNAME")"
+  [[ -z $servicedef ]] && fatal "service '$SNAME' on '$HNAME' not found"
+  object_to_cvars SERVICE "$servicedef"
+
+fi
+
+if [[ $CNAME == "" ]]; then
+  check_command=( $(echo "${servicedef:-$hostdef}" | grep $'^\tcheck_command=') )
+  [[ ${#check_command[@]} != 1 ]] && fatal "bad or no check_command"
+  check_command="${check_command#*=}"
+else
+  check_command="$CNAME"
+fi
+
+commanddef=$(extract_nagios_block ${OBJECTDB} "" "" "${check_command%%\!*}")
+
+command_line=$(echo "$commanddef" | grep $'^\tcommand_line\t')
+command_line="${command_line#*command_line$'\t'}"
+
+exec_line=${command_line}
+
+# load command line vars
+for var in "${ARGS[@]:3}"; do
+  CVARS[${var%%=*}]="${var#*=}"
+done
+
+# replace vars
+for var in "${!CVARS[@]}"; do
+  # change vars with value
+  exec_line="${exec_line//\$${var}\$/${CVARS[$var]}}"
+done
+
+if [[ $EXEC == 1 ]]; then
+  trap "" ERR
+  eval "$exec_line"
+else
+  echo "$check_command"
+  echo "$command_line"
+  echo "$exec_line"
+fi
+
