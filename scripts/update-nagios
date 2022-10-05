@@ -119,23 +119,7 @@ function do_build() {
           debug -3 "HOST LINE : <$equipement> <$adresse> <$type> <$authentification>/<$secname,$authpassword,$privpassword> <$parent> <$alias> ####"
           debug "host($equipement,$type)"
 
-          unset useauth
-          unset autocred
-
-#          if [[ $secname || $authpassword || $privpassword ]]; then
-#            autocred=$(credentials list | grep "^_auto_cred_$equipement$")
-#            if [[ $autocred ]]; then
-#              info "Remove old credential for $equipement"
-#              credentials del -- "_auto_cred_$equipement"
-#            fi
-#            info "Adding credential for $equipement"
-#            credentials add -- "_auto_cred_$equipement" snmpv3 ${secname:+-u $secname} ${authpassword:+-A $authpassword} ${privpassword:+-X $privpassword}
-#            autocred="_auto_cred_$equipement"
-#            useauth=_${autocred}${authentification:+,_$authentification}
-#          else
-#            useauth=${authentification:+,_$authentification}
-#          fi
-
+          unset useauth autocred
           useauth=${authentification:+_cred_snmp_$authentification}
           useauth=${useauth:=_cred_snmp_default}
 
@@ -148,13 +132,45 @@ function do_build() {
           host "${PARAMS[@]}" > $cfgdir/$equipement.cfg ||
             fatal "host() returns code $?"
         
-#          if [[ ${SERVICES[${HOST_TEMPLATE[$CURRENT_HOST]}:if-generic]} ]]; then
-#            service IF-GENERIC:${HOST_TEMPLATE[$CURRENT_HOST]}:if-generic name=$equipement:if-generic register=0 >> $cfgdir/$equipement.cfg ||
-#              fatal "service(IF-GENERIC) returns code $?"
-#          fi
-
           host-end >> $cfgdir/$equipement.cfg ||
             fatal "host-end() returns code $?"
+
+        elif [[ $equipement && $interface ]]; then		# Gestion d'une section "SERVICE"
+
+          debug -3 "SERVICE LINE : <$equipement> <$servicee> ####"
+          debug "service($equipement,$service)"
+
+#          [[ -z $status ]] && status="up"
+#
+#          case "${type,,}" in
+#            "network"|*)
+#
+#              case "${status,,}" in
+#                down|down/down) status_admin=down ; status_oper=down ;;
+#                up/down) status_admin=up ; status_oper=down ;;
+#                *) status_admin=up ; status_oper=up ;;
+#              esac
+#
+#              iface=${description:-$interface}
+#	      iface="${iface//[^[:alnum:]_-]/_}"
+#
+#              PARAMS=(
+#                #"IF-${interface}"
+#                "IF-${iface}"
+#                --host="${equipement}"
+#                check_command="check_snmp_interface"
+#                #display_name=IF-${description:-$interface}
+#                display_name=IF-${iface}
+#                __IFACE="$interface"
+#                __STATUS_ADMIN="${status_admin,,}"
+#                __STATUS_OPER="${status_oper,,}"
+#              )
+#              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
+#                fatal "service() returns code $?"
+#
+#              ;;
+#
+#          esac
 
         elif [[ $equipement && $interface ]]; then		# Gestion d'une section "IFACE"
 
@@ -164,127 +180,6 @@ function do_build() {
           [[ -z $status ]] && status="up"
 
           case "${type,,}" in
-#            "ipsla")
-#              PARAMS=(
-#                "IPSLA-${interface}"
-#                --host="${equipement}"
-#                check_command="check_snmp_cisco_ipsla_raw"
-#                display_name=IPSLA-${description:-$interface}
-#                __IPSLA_PEER="${description:-$interface}"
-#                __IPSLA_ID="$interface"
-#                __RRD_STEP="60"
-#                check_interval="1"
-#              )
-#              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                fatal "service() returns code $?"
-#              ;;
-#
-#            "ipsec")
-#              # PARAMS=(
-#              #  "IPSEC-${interface}:passive"
-#              #   --host="${equipement}"
-#              #   display_name=IPSEC-${description:-$interface}
-#              # )
-#              # service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#              #   fatal "service() returns code $?"
-#              (( IPSEC[${equipement}]++ ))
-#              ;;
-#
-#            "e1"|"engage")
-#              unset net_if lan_if tel_if
-#
-#              case "${interface,,}" in
-#                eth0) net_if=eth0 ;;
-#                lan1) lan_if=3 ;;
-#                lan2) lan_if=4 ;;
-#                tel1) tel_if=5 ;;
-#                tel2) tel_if=6 ;;
-#                tel3) tel_if=7 ;;
-#                tel4) tel_if=8 ;;
-#              esac
-#               
-#              if [[ $net_if ]]; then
-#
-#                case "${status,,}" in
-#                  down|down/down) status_admin=down ; status_oper=down ;;
-#                  up/down) status_admin=up ; status_oper=down ;;
-#                  *) status_admin=up ; status_oper=up ;;
-#                esac
-#
-#                PARAMS=(
-#                  "ETAT-ADM-IF-${net_if}"
-#                  --host="${equipement}"
-#                  check_command="check_snmp_interface_adm"
-#                  display_name=ETAT-ADM-IF-${description:-$net_if}
-#                  __IFACE="$net_if"
-#                  __STATUS_ADMIN="${status_admin,,}"
-#                  __STATUS_OPER="${status_oper,,}"
-#                )
-#                service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                  fatal "service() returns code $?"
-#
-#                PARAMS=(
-#                  "ETAT-OPER-IF-${net_if}"
-#                  --host="${equipement}"
-#                  check_command="check_snmp_interface_oper"
-#                  display_name=ETAT-OPER-IF-${description:-$net_if}
-#                  __IFACE="$net_if"
-#                  __STATUS_ADMIN="${status_admin,,}"
-#                  __STATUS_OPER="${status_oper,,}"
-#                )
-#                service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                  fatal "service() returns code $?"
-#
-#              elif [[ $lan_if ]]; then
-#
-#                case "${status,,}" in
-#                  down|down/down) status_admin=2 ; status_oper=2 ;;
-#                  up/down) status_admin=1 ; status_oper=2 ;;
-#                  *) status_admin=1 ; status_oper=1 ;;
-#                esac
-#
-#                PARAMS=(
-#                  "ETAT-ADM-IF-${lan_if}:PASSIVE"
-#                  --host="${equipement}"
-#                  # check_command="check_snmp_interface_e1_adm"
-#                  display_name=ETAT-ADM-IF-${description:-$lan_if}
-#                  __IFACE="$lan_if"
-#                  __STATUS_ADMIN="${status_admin,,}"
-#                  __STATUS_OPER="${status_oper,,}"
-#                )
-#                service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                  fatal "service() returns code $?"
-#
-#                PARAMS=(
-#                  "ETAT-OPER-IF-${lan_if}:PASSIVE"
-#                  --host="${equipement}"
-#                  # check_command="check_snmp_interface_e1_oper"
-#                  display_name=ETAT-OPER-IF-${description:-$lan_if}
-#                  __IFACE="$lan_if"
-#                  __STATUS_ADMIN="${status_admin,,}"
-#                  __STATUS_OPER="${status_oper,,}"
-#                )
-#                service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                fatal "service() returns code $?"
-#
-#              elif [[ $tel_if ]]; then
-#
-#                case "${status,,}" in
-#                  down|down/down) status_admin=2 ; status_oper=2 ;;
-#                  up/down) status_admin=1 ; status_oper=2 ;;
-#                  *) status_admin=1 ; status_oper=1 ;;
-#                esac
-#
-#                PARAMS=(
-#                  "CTRL-ETAT-E1-${tel_if}:passive"
-#                  --host="${equipement}"
-#                  display_name=CTRL-ETAT-E1-${description:-$tel_if}
-#                )
-#                service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                  fatal "service() returns code $?"
-#              fi
-#              ;;
-#
             "network"|*)
 
               case "${status,,}" in
@@ -292,30 +187,6 @@ function do_build() {
                 up/down) status_admin=up ; status_oper=down ;;
                 *) status_admin=up ; status_oper=up ;;
               esac
-
-#              PARAMS=(
-#                "ETAT-ADM-IF-${interface}"
-#                --host="${equipement}"
-#                check_command="check_snmp_interface_adm"
-#                display_name=ETAT-ADM-IF-${description:-$interface}
-#                __IFACE="$interface"
-#                __STATUS_ADMIN="${status_admin,,}"
-#                __STATUS_OPER="${status_oper,,}"
-#              )
-#              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                fatal "service() returns code $?"
-
-#              PARAMS=(
-#                "ETAT-OPER-IF-${interface}"
-#                --host="${equipement}"
-#                check_command="check_snmp_interface_oper"
-#                display_name=ETAT-OPER-IF-${description:-$interface}
-#                __IFACE="$interface"
-#                __STATUS_ADMIN="${status_admin,,}"
-#                __STATUS_OPER="${status_oper,,}"
-#              )
-#              service "${PARAMS[@]}" >> $cfgdir/$equipement.cfg ||
-#                fatal "service() returns code $?"
 
               iface=${description:-$interface}
 	      iface="${iface//[^[:alnum:]_-]/_}"
