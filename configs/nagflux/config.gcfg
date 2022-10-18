@@ -1,0 +1,62 @@
+[main]
+    NagiosSpoolfileFolder = "/var/spool/nagflux"
+    NagiosSpoolfileWorker = 1
+    InfluxWorker = 2
+    MaxInfluxWorker = 5
+    DumpFile = "nagflux.dump"
+    NagfluxSpoolfileFolder = "/var/lib/nagflux"
+    FieldSeparator = "&"
+    BufferSize = 10000
+    FileBufferSize = 65536
+    # If the performancedata does not have a certain target set with NAGFLUX:TARGET.
+    # The following field will define the target for this data.
+    # "all" sends the data to all Targets(every Influxdb, Elasticsearch...)
+    # a certain name will direct the data to this certain target
+    DefaultTarget = "all"
+
+[Log]
+    # leave empty for stdout
+    LogFile = ""
+    # List of Severities https://godoc.org/github.com/kdar/factorlog#Severity
+    MinSeverity = "INFO"
+
+[Livestatus]
+    # tcp or file
+    Type = "file"
+    # tcp: 127.0.0.1:6557 or file /var/run/live
+    Address = "/var/lib/nagios4/rw/live.socket"
+    # The amount to minutes to wait for livestatus to come up, if set to 0 the detection is disabled
+    MinutesToWait = 2
+    # Set the Version of Livestatus. Allowed are Nagios, Icinga2, Naemon.
+    # If left empty Nagflux will try to detect it on it's own, which will not always work.
+    Version = "Nagios"
+
+[InfluxDBGlobal]
+    CreateDatabaseIfNotExists = true
+    NastyString = ""
+    NastyStringToReplace = ""
+    HostcheckAlias = "hostcheck"
+    ClientTimeout  = 5
+
+[InfluxDB "nagflux"]
+    Enabled = true
+    Version = 1.0
+    Address = "http://127.0.0.1:8086"
+    Arguments = "precision=ms&u=root&p=root&db=nagflux"
+    StopPullingDataIfDown = true
+
+[InfluxDB "fast"]
+    Enabled = false
+    Version = 1.0
+    Address = "http://127.0.0.1:8086"
+    Arguments = "precision=ms&u=root&p=root&db=fast"
+    StopPullingDataIfDown = false
+
+[JSONFileExport "one"]
+    Enabled = false
+    Path = "export/json"
+    # Timeinterval  in Seconds till a new file will be used. 0 for no rotation.
+    # If no rotation is selected, the JSON Objects are appended line by line so,
+    #   every single line is valid JSON but the whole file not.
+    # If rotation is selected every file as whole is valid JSON.
+    AutomaticFileRotation = "10"
