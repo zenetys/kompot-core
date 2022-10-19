@@ -2,7 +2,7 @@
 
 # set -x
 
-function header() { 
+function header() {
   printf "%s\r\n" "$*"
 }
 

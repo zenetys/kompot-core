@@ -27,6 +27,6 @@ else
   echo "${STATUS[$exit_status]}: All processes found"
 fi
 
-echo 
+echo
 
 exit $exit_status

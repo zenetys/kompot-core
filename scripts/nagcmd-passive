@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NAGIOS_EXTERNAL_COMMAND_FILE=${NAGIOS_EXTERNAL_COMMAND_FILE:-/var/lib/nagios4/rw/nagios.cmd}
-declare -A STATES=( 
+declare -A STATES=(
  [0]=0 [1]=1 [2]=2 [3]=3
  [OK]=0 [WARNING]=1 [CRITICAL]=2 [UNKNOWN]=3
  [UP]=0 [DOWN]=1 [UNREACHABLE]=2

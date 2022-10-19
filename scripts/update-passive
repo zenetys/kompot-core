@@ -64,7 +64,7 @@ function usage() {
       printf " %-20s %s\n" "$OPT" "$DESC"
     done
   echo
-  
+
   echo "<ACTION> is one of :"
   sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
     while read OPT DESC ; do
@@ -90,7 +90,7 @@ function do_build() {
 
   mkdir -p $cfgdir
   debug "Create conf.d to '$cfgdir'"
-  
+
   # convert xls to csv
   # - lines starting by # are ignored
   # - separator is ',' (coma)
@@ -111,7 +111,7 @@ function do_build() {
 	  [[ $program ]] && echo "PATTERN:PROGRAM \"$program\""
 
 	  [[ $hostname ]] && echo "PATTERN:HOSTNAME \"$hostname\""
-          
+
           echo PATTERN \"${pattern//\"/\\\"}\"
           [[ $rewrite ]] && echo REWRITE \"${rewrite//\"/\\\"}\"
           case ${status,,} in
@@ -151,7 +151,7 @@ function do_apply() {
 
   [[ -L ${CFGDIR}/new ]] ||
     fatal "bad configuration: '${CFGDIR}/new' do not link to configuration"
-  
+
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
@@ -173,7 +173,7 @@ function do_revert() {
 
   [[ -L ${CFGDIR}/previous ]] ||
     fatal "can't revert to unknown configuration"
-  
+
   if [[ -L ${CFGDIR}/current ]]; then
     debug "Disable current ${CFGDIR}/$(readlink ${CFGDIR}/current)"
     [[ -L ${CFGDIR}/old ]] && rm ${CFGDIR}/old

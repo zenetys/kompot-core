@@ -64,7 +64,7 @@ function usage() {
       printf " %-20s %s\n" "$OPT" "$DESC"
     done
   echo
-  
+
   echo "<ACTION> is one of :"
   sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
     while read OPT DESC ; do
@@ -126,9 +126,9 @@ function do_build() {
     printf '}'
     echo ", ok" >&2
   done >> $cfgdir/config.json
-  
+
   printf "\n      ]\n    }\n  ]\n}\n" >> $cfgdir/config.json
-    
+
   # validate link to new config
   ln -snf ${cfgdir##*/} ${CFGDIR}/new
 }
@@ -139,11 +139,11 @@ function do_apply() {
 
   [[ -L ${CFGDIR}/new ]] ||
     fatal "bad configuration: '${CFGDIR}/new' do not link to configuration"
-  
+
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
-  
+
   info "New configuration applied and linked to ${CFGDIR}/current"
 }
 
@@ -153,7 +153,7 @@ function do_revert() {
 
   [[ -L ${CFGDIR}/previous ]] ||
     fatal "can't revert to unknown configuration"
-  
+
   if [[ -L ${CFGDIR}/current ]]; then
     debug "Disable current ${CFGDIR}/$(readlink ${CFGDIR}/current)"
     [[ -L ${CFGDIR}/old ]] && rm ${CFGDIR}/old

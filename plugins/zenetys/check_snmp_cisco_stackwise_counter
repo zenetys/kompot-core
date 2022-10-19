@@ -60,11 +60,11 @@ function in_range() {
     ~:[0-9]*) start=${range#*:} ;;
     *) start=0; end=${range} ;;
   esac
-  
-  [[ $start && -z ${start//[0-9]} ]] || pexit -3 "bad start in range '$range'"  
+
+  [[ $start && -z ${start//[0-9]} ]] || pexit -3 "bad start in range '$range'"
   [[ $end   && -z ${end//[0-9]}   ]] || pexit -3 "bad end in range '$range'"
-  
-  if ((complement == 0)); then 
+
+  if ((complement == 0)); then
     if (( $start && $end )); then
       (( $start <= $value && $value <= $end )) && return 0
       (( $value < $start )) && REPLY=$start
@@ -139,7 +139,7 @@ while (( $# > 0 )); do
     --mode) MODE=$2; shift;;
 
     --critical) CRITICAL=$2; shift;;
-        
+
     ## ignore others arguments
     --) break ;;
     ## store unknown args

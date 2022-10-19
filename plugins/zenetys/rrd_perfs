@@ -54,9 +54,9 @@ function computeRRA {
   local IFS=' '
 
   REPLY=(
-    # 1hour with step precision 
+    # 1hour with step precision
     RRA:AVERAGE:0.5:1:$((1*3600/$step))
-    # 25hours with 5mn precision 
+    # 25hours with 5mn precision
     RRA:{AVERAGE,MIN,MAX}:0.5:$((300/$step)):$((1*3600*25/300))
     # 32days with 15mn precision
     RRA:{AVERAGE,MIN,MAX}:0.5:$((900/$step)):$((3600*24*32/900))
@@ -138,7 +138,7 @@ fi
 
 VALUES=( ${PERFDATA[@]#*=} )
 VALUES=( ${VALUES[@]%%$'\x3b'*} ) # \x3b => ";"
- 
+
 IFS=':'
 rrdupdate "$RRDFILE" "N:${VALUES[*]}"
 

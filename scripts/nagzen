@@ -64,7 +64,7 @@ function usage() {
       printf " %-20s %s\n" "$OPT" "$DESC"
     done
   echo
-  
+
   echo "<ACTION> is one of :"
   sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
     while read OPT DESC ; do
@@ -86,9 +86,9 @@ function version() {
 
 function build_key() {
   local __v __k
- 
+
   [[ $1 == -v ]] && __k=$2 __v=$3 || __k=REPLY __v=$1
-  
+
   __v=${__v//[^0-9a-zA-Z:_-]/_}
   printf -v $__k "%s" "$__v"
 }
@@ -103,13 +103,13 @@ function dump_nagios_object() {
   for field in "$@"; do
     attr="${field%%=*}"
     value="${field#*=}"
-    
+
     # save *_name value for diag
     [[ -z $name && ${attr#*_} == "name" ]] && name=${value}
     # key-transform 'parents' attr
     # FIXME: do not support multiple parents
     [[ $attr == "parents" ]] && build_key -v value "$value"
-    
+
     if [[ ${attr} == "use" ]]; then
       use="${use:+$use,}${value}"
     elif [[ -z ${defined[${attr}]} ]]; then
@@ -151,7 +151,7 @@ function host() {
   CURRENT_HOST="$hostid"
   HOST_TEMPLATE[$CURRENT_HOST]="$use"
   HOST_FULLNAME[$CURRENT_HOST]="$dname"
-  
+
   if [[ ${HOSTS[$CURRENT_HOST]} == 1 ]]; then
     fatal "duplicate host ${HOST_FULLNAME[$CURRENT_HOST]}"
   elif [[ ${1} == --template ]]; then

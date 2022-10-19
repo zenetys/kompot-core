@@ -37,7 +37,7 @@ BEGIN {
 
   EXIT_CODE = 1;
 }
-{ 
+{
   if ($2 == "{") {
     section = ""; hname = ""; sname = "";
     if ($1 == MODE)
@@ -58,7 +58,7 @@ BEGIN {
   else if (substr($0, 1, 1) != "\t") {
     next;
   }
-  
+
   var = substr($1, 1, index($1, "=") - 1);
   val = substr($0, index($0, "=") + 1);
 

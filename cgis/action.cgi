@@ -121,7 +121,7 @@ AUTHOR="${REMOTE_USER:-anonymous}"
 
 [[ -n $ACTION && -z ${ACTION//[a-zA-Z0-9-_]} ]] ||
   fatal "bad action '$ACTION'"
-  
+
 [[ $COMMENT ]] ||
   fatal "empty comment"
 

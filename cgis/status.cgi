@@ -75,7 +75,7 @@ function hostlist() {
           !(var in REGISTER_T) &&
           !(var in REGISTER_B))
         continue;
-      
+
       if (section == HOSTSTATUS && var == "host_name") {
         if (filter && filter != val) { host_name = ""; continue; }
         if (host_name) printf("\n%s},\n", L3);
@@ -126,7 +126,7 @@ function servicelist() {
           !(var in REGISTER_T) &&
           !(var in REGISTER_B))
         continue;
-      
+
       if (section == HOSTSTATUS && var == "host_name") {
         if (filter && filter != val) { host_name = ""; continue; }
         host_name = val;
@@ -263,7 +263,7 @@ BEGIN {
 
   HOSTSTATUS = "hoststatus";
   SERVICESTATUS = "servicestatus";
-  
+
   REGISTER_S["host_name"] = 1;
   REGISTER_S["service_description"] = 1;
   REGISTER_S["display_name"] = 1;

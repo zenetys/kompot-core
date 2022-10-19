@@ -42,7 +42,7 @@ function cState2(h,s) {
   let st=sha[h.status];
   for([k,v] of Object.entries(s)) st=ssa[v.status]>st?ssa[v.status]:st;;
   return(st<=2?"grey":st<=4?"green":st<=5?"yellow":st<=7?"red":"orange");
-} 
+}
 
 function cState(d) {
   const GREEN = "#4CAF50";
@@ -80,7 +80,7 @@ function outputDiv(text, width, height) {
 }
 
 function htmlEntities(s) {
-  const entities = { "&":"&amp", "<":"&lt;", ">":"&gt;", '"':"&quot;", 
+  const entities = { "&":"&amp", "<":"&lt;", ">":"&gt;", '"':"&quot;",
                      "'":"&apos;" };
   return (s.replace(/([&<>\"'])/g, m => entities[m]));
 }

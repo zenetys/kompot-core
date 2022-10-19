@@ -30,7 +30,7 @@ function rewrite(re, a, new, t, alias) {
   # local new   : new string
   # local t     : temporary index
   # local alias : temporary alias
-  
+
   new = "";
   while(length(re) > 1) {
     if (!(t = index(re, "\\"))) break;
@@ -74,7 +74,7 @@ function rsyslog_ack() {
 function cleanup_watchers() {
   # local k   : key
   # local now : current time
-  
+
   # cleanup watch list
   if (length(WATCHERS_TIMEOUT)) {
     now = systime();
@@ -154,7 +154,7 @@ function config( record, i, iattr, value, line) {
     # bypass coments
     if (substr($0, 1, 1) == "#")
       continue;
-    
+
     # empty lines are new sections
     if (NF == 0) {
       # empty line
@@ -170,7 +170,7 @@ function config( record, i, iattr, value, line) {
       FLAGS[record] = 0x0002;
       continue;
     }
-    
+
     # detect & treat keywords
     if (substr($1,1,7) == "PATTERN") {
       if (substr($1,8,1) == ":") {
@@ -291,7 +291,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     notify = 0;
     delete matches;
     delete e;
-    
+
     # loop on each rules attr
     for (ia = 1; ia <= NATTRS; ia++) {
       e[ia] = ea[ia];
@@ -317,7 +317,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
 
         if (REWRITES[ir,ia]) {
           e[ia] = rewrite(REWRITES[ir,ia], a);
-          # dump("rewrite", e); 
+          # dump("rewrite", e);
         }
       }
       else {
@@ -325,7 +325,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
         break;
       }
     }
-    
+
     if (notify == 0) continue;
 
     if (DEBUG >= 2) dump("match", ea);
@@ -369,7 +369,7 @@ function main(line, ea, e, r, ir, ia, i, a, notify, matches) {
     }
 
     if (notify == 0) continue;
-      
+
     # start actions
     if (DEBUG >= 1) dump("notify", e);
 
@@ -415,21 +415,21 @@ BEGIN {
     IATTRS[IATTRS[attr]] = attr;
     NATTRS = (NATTRS < IATTRS[attr]) ? IATTRS[attr] : NATTRS;
   }
-  
+
   NAGIOS_STATES[0x0010] = 2; # CRITICAL
   NAGIOS_STATES[0x0020] = 1; # WARNING
   NAGIOS_STATES[0x0040] = 0; # OK
   NAGIOS_STATES[0x0000] = 3; # UNKNOWN
-  
+
   DIGIT_STRING = "0123456789";
   for (i = 1; i < length(DIGIT_STRING); i++)
     DIGITS[substr(DIGIT_STRING, i, 1)] = i;
 
   # initialize potentialy empty array
-  delete RULENAMES;  
+  delete RULENAMES;
   delete WATCHERS_TIMEOUT;
   delete ALIAS;
-  
+
   if (CONFIG) {
     config();
   }
