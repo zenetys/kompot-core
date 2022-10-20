@@ -131,7 +131,8 @@ function do_apply() {
   cp --force "${CFGDIR}/current/snmptrapd.local.conf" "/var/lib/snmp/"
 
   systemctl stop snmptrapd
-  sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
+  [[ -f /var/lib/snmp/snmptrapd.conf ]] &&
+    sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
   systemctl start snmptrapd
   systemctl restart snmptrapd
 
@@ -158,7 +159,8 @@ function do_revert() {
   cp --force "${CFGDIR}/current/snmptrapd.local.conf" /var/lib/snmp/
 
   systemctl stop snmptrapd
-  sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
+  [[ -f /var/lib/snmp/snmptrapd.conf ]] &&
+    sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
   systemctl start snmptrapd
   systemctl restart snmptrapd
 
