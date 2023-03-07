@@ -115,8 +115,14 @@ function fatal() {
 }
 
 function usage() {
-  echo "Usage: ${0##*/} HOST [SERVICE]"
-  echo "  -h, --help: this help"
+  echo "Usage: ${0##*/} [OPTION...] HOST [SERVICE]"
+  echo 'Get the command executed by nagios when chcking an indicator'
+  echo
+  echo 'Supported options:'
+  sed -nre 's,^\s+## (-[^:]+):\s+(.*),\1\t\2,p' "$0" |
+    while IFS=$'\t' read -r k v; do
+      printf '  %-16s    %s\n' "$k" "$v"
+    done
 }
 
 function onError() {
