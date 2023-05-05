@@ -1,4 +1,4 @@
-#!/bin/env ./lib.cgi
+#!/usr/bin/env ./lib.cgi
 #
 ##
 ## Copyright (c) 2018-2019 Benoit DOLEZ - License MIT

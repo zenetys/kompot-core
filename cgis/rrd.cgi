@@ -1,4 +1,4 @@
-#!/bin/env ./lib.cgi
+#!/usr/bin/env ./lib.cgi
 
 [[ -n ${_GET_start//[0-9a-zA-Z\-]} ]] &&
   fatal "bad value for 'start' parameter"
