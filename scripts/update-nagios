@@ -84,6 +84,10 @@ function version() {
   echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
 }
 
+function lastlog() {
+    tail -n 30 "$NAGIOSLOG" |grep --color=auto -E '^|^\[[0-9]+\] (Error|Warning):.*'
+}
+
 # X-ACTION build <filename.xls>: build config with input filename.xls
 function do_build() {
   local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
@@ -245,7 +249,7 @@ function do_apply() {
   zservice restart nagios
   sleep 1
   if ! zservice status nagios >/dev/null; then
-    journalctl -n 30 --no-pager --unit nagios4.service
+    lastlog
     warning "Rollback to the old configuration"
     do_revert
     return 1
@@ -281,13 +285,14 @@ function do_revert() {
   zservice restart nagios
   sleep 1
   if ! zservice status nagios >/dev/null; then
-    journalctl -n 30 --no-pager --unit nagios4.service
+    lastlog
     fatal "Rollback failed, no active configuration running"
   fi
 }
 
 declare VERBOSE=${VERBOSE:-1}
 declare BASEDIR=${BASEDIR:-/var/lib/kompot/configs/nagios}
+declare NAGIOSLOG=${NAGIOSLOG:-/var/log/nagios/nagios.log}
 declare CFGDIR=${BASEDIR}
 
 export PATH=${PATH}:${0%/*}
