@@ -1,6 +1,6 @@
 #!/bin/bash
 
-NAGIOS_STATUS_FILE=${NAGIOS_STATUS_FILE:-/var/lib/nagios4/status.dat}
+NAGIOS_STATUS_FILE=${NAGIOS_STATUS_FILE:-/var/spool/nagios/status.dat}
 MODE=${MODE:-hostservice}
 FILTER_HOST=$1
 FILTER_SVC=$2
