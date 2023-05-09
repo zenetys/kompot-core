@@ -1,0 +1,26 @@
+#!/bin/bash
+
+NAGIOS_CFG=${NAGIOS_CFG:-/etc/nagios/nagios.cfg}
+NAGIOS_FIFO=$(sed -nre 's,^\s*command_file\s*=\s*(.+)\s*,\1,p' "$NAGIOS_CFG")
+[[ ${NAGIOS_FIFO:0:1} == / ]] || NAGIOS_FIFO="${NAGIOS_CFG%/*}/$NAGIOS_FIFO"
+
+if (( $# < 1 || $# > 2 )); then
+  echo "Usage: ${0##*/} HOST [SERVICE]" >&2
+  exit 1
+fi
+
+if [[ ! -p "$NAGIOS_FIFO" ]]; then
+  echo "Invalid Nagios FIFO: $NAGIOS_FIFO" >&2
+  exit 1
+fi
+
+HST=$1 ; shift
+SVC=$1 ; shift
+NOW=$(date +%s)
+
+if [[ -z "$SVC" ]]; then
+  echo "[$NOW] SCHEDULE_FORCED_HOST_CHECK;$HST;$NOW" >> "$NAGIOS_FIFO"
+  echo "[$NOW] SCHEDULE_FORCED_HOST_SVC_CHECKS;$HST;$NOW" >> "$NAGIOS_FIFO"
+else
+  echo "[$NOW] SCHEDULE_FORCED_SVC_CHECK;$HST;$SVC;$NOW" >> "$NAGIOS_FIFO"
+fi
