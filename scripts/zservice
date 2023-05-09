@@ -1,0 +1,118 @@
+#!/bin/bash
+
+set -f
+PROGNAME=${0##*/}
+PLATFORM= # automatically guessed
+RUNIT_SV_DIR=/etc/sv
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ "$status" != "0" ]] && exec >&2
+    echo "\
+Usage: $PROGNAME status|start|stop|restart|reload|condrestart SERVICE...
+       $PROGNAME platform
+Abstraction script to manage services on different platforms"
+    exit "$status"
+}
+
+function fatal() {
+    echo "FATAL: $PROGNAME: ${PLATFORM:+$[$PLATFORM] }$*" >&2
+    exit 99
+}
+
+function get-service-platform() {
+    local initcmd=$(ps -e -q 1 --no-headers -o comm)
+    if [[ $initcmd == systemd ]]; then
+        REPLY=systemd
+        return 0
+    fi
+    if [[ ( -f /.dockerenv || -f /run/.containerenv ) && -d $RUNIT_SV_DIR/. ]]; then
+        REPLY=runit
+        return 0
+    fi
+    if [[ $initcmd == init && -x /sbin/service ]]; then
+        REPLY=sysv
+        return 0
+    fi
+    REPLY=
+    return 1
+}
+
+# systemd implementation
+function do-systemd-status() { systemctl status "$@"; }
+function do-systemd-start() { systemctl start "$@"; }
+function do-systemd-stop() { systemctl stop "$@"; }
+function do-systemd-restart() { systemctl restart "$@"; }
+function do-systemd-reload() { systemctl reload "$@"; }
+function do-systemd-condrestart() { systemctl condrestart "$@"; }
+
+# runit implementation
+function do-runit-status() {
+    # sv status displays stopped services as down but does not
+    # reflect that with an exit code > 0, however it exits
+    # non zero if the service does not exist.
+    local status_ret
+    REPLY=$(sv status "${@/#/$RUNIT_SV_DIR/}"); status_ret=$?
+    echo "$REPLY"
+    (( status_ret == 0 )) || return 2
+    echo "$REPLY" |grep -qvE '^run: ' && return 1
+    return 0
+}
+
+function do-runit-start() { sv start "${@/#/$RUNIT_SV_DIR/}"; }
+function do-runit-stop() { sv stop "${@/#/$RUNIT_SV_DIR/}"; }
+function do-runit-restart() { sv restart "${@/#/$RUNIT_SV_DIR/}"; }
+function do-runit-reload() { sv reload "${@/#/$RUNIT_SV_DIR/}"; }
+
+function do-runit-condrestart() {
+    local i ret=0
+    for i in "$@"; do
+        do-runit-status "$i" >/dev/null || continue
+        do-runit-restart "$i" || ret=1
+    done
+    return "$ret"
+}
+
+# sysv implementation
+function do-sysv-status() {
+    local i ret=0
+    for i in "$@"; do
+        /sbin/service "$i" ${SYSV_ACTION:-status} || ret=1
+    done
+    return "$ret"
+}
+
+function do-sysv-start() { SYSV_ACTION=start do-sysv-status "$@"; }
+function do-sysv-stop() { SYSV_ACTION=stop do-sysv-status "$@"; }
+function do-sysv-restart() { SYSV_ACTION=restart do-sysv-status "$@"; }
+function do-sysv-reload() { SYSV_ACTION=reload do-sysv-status "$@"; }
+
+function do-sysv-condrestart() {
+    local i ret=0
+    for i in "$@"; do
+        do-sysv-status "$i" >/dev/null || continue
+        do-sysv-restart "$i" || ret=1
+    done
+    return "$ret"
+}
+
+# main
+
+ACTION=$1; shift
+
+# special commands
+if [[ $ACTION == platform ]]; then
+    get-service-platform || exit $?
+    echo "$REPLY"
+    exit 0
+fi
+
+# services commands
+SERVICES=( "$@" ); shift $#
+
+[[ -z $ACTION || -z $SERVICES ]] && exit_usage 1
+get-service-platform || fatal 'Cannot guess service platform!'
+PLATFORM=$REPLY
+
+declare -f -F "do-$PLATFORM-$ACTION" > /dev/null || exit_usage 1
+"do-$PLATFORM-$ACTION" "${SERVICES[@]}"
