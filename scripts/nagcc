@@ -126,9 +126,9 @@ function onError() {
   echo "${BASH_SOURCE[1]}:${BASH_LINENO[0]} in ${FUNCNAME[1]}: ERROR" >&2
 }
 
-declare STATUSDB=${NAGCC_STATUSDB:-/var/lib/nagios4/status.dat}
-declare OBJECTDB=${NAGCC_OBJECTDB:-/var/lib/nagios4/objects.cache}
-declare RESOURCE=${NAGCC_RESOURCE:-/etc/nagios4/resource.cfg}
+declare STATUSDB=${NAGCC_STATUSDB:-/var/spool/nagios/status.dat}
+declare OBJECTDB=${NAGCC_OBJECTDB:-/var/spool/nagios/objects.cache}
+declare RESOURCE=${NAGCC_RESOURCE:-/etc/nagios/resource.cfg}
 
 declare -A CVARS=( )
 declare -a ARGS=( )
