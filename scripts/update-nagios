@@ -242,9 +242,9 @@ function do_apply() {
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
-  systemctl restart nagios4
+  zservice restart nagios
   sleep 1
-  if ! systemctl is-active -q nagios4; then
+  if ! zservice status nagios >/dev/null; then
     journalctl -n 30 --no-pager --unit nagios4.service
     warning "Rollback to the old configuration"
     do_revert
@@ -278,9 +278,9 @@ function do_revert() {
   info "Previous configuration applied and linked to ${CFGDIR}/current"
 
   mv ${CFGDIR}/previous ${CFGDIR}/current
-  systemctl restart nagios4
+  zservice restart nagios
   sleep 1
-  if ! systemctl is-active -q nagios4; then
+  if ! zservice status nagios >/dev/null; then
     journalctl -n 30 --no-pager --unit nagios4.service
     fatal "Rollback failed, no active configuration running"
   fi
