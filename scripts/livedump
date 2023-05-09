@@ -1,0 +1,3 @@
+#!/bin/sh
+[[ $1 == -t ]] && pretty=( column -t -s $'\t' -T 5 ) || pretty=( cat )
+{ echo $'GET hosts\nColumns: host_name state last_check plugin_output\nOutputFormat: csv\nSeparators: 10 9 44 124' |unixcat /var/spool/nagios/cmd/live.sock |sed -re 's,^([^\t]+\t),\1--host--\t,'; echo $'GET services\nColumns: host_name description state last_check plugin_output\nOutputFormat: csv\nSeparators: 10 9 44 124' |unixcat /var/spool/nagios/cmd/live.sock; } |sort -t $'\t' -k 1,2 |"${pretty[@]}"
