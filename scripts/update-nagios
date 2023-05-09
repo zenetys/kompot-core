@@ -287,7 +287,7 @@ function do_revert() {
 }
 
 declare VERBOSE=${VERBOSE:-1}
-declare BASEDIR=${BASEDIR:-/var/lib/configs/nagios}
+declare BASEDIR=${BASEDIR:-/var/lib/kompot/configs/nagios}
 declare CFGDIR=${BASEDIR}
 
 export PATH=${PATH}:${0%/*}
