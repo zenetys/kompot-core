@@ -1,0 +1,451 @@
+#!/usr/bin/bash
+
+set -f
+export PATH="$PATH:${0%/*}"
+PROGNAME=${0##*/}
+DRY_RUN=
+
+INSTALL_FILE_DEFAULTS=( -m 0644 -o root -g root )
+INSTALL_DIR_DEFAULTS=( -m 0755 -o root -g root )
+
+KOMPOT_INSTALL_VAR_LOG_FILE=/opt/kompot/share/install.var-log
+KOMPOT_PERSIST_VERSION_FILE=/etc/kompot/.version
+{ KOMPOT_PERSIST_VERSION=$(< "$KOMPOT_PERSIST_VERSION_FILE"); } 2>/dev/null
+KOMPOT_VERSION=$(rpm -q kompot-setup --qf '%{version}-%{release}')
+
+[[ -t 0 ]] && INTERACTIVE=1 || INTERACTIVE=
+
+declare -A C=()
+if [[ -t 1 ]]; then
+    C+=(
+        [info]=$'\x1b[1m'
+        [warning]=$'\x1b[7;33m'
+        [err]=$'\x1b[1;91m'
+        [crit]=$'\x1b[7;91m'
+        [_]=$'\x1b[m'
+    )
+fi
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ "$status" != "0" ]] && exec >&2
+    echo "\
+Usage: $PROGNAME [OPTION...]
+Setup kompot for the system
+
+Available options:
+  -n, --dry-run     Dry-run mode, do not change anything.
+  -h, --help        Display this help."
+    exit "$status"
+}
+
+function _log() {
+    local now=$(date +%Y-%m-%dT%H:%M:%S.%3N%:z)
+    local severity=$1; shift
+    local label=$1; shift
+    [[ -n $INTERACTIVE ]] || logger -t "$PROGNAME[$$]" -p "$severity" -- "${DRY_RUN:+DRY-RUN ** }$*"
+    echo "$now ${C[$severity]}${label}${C[_]} $PROGNAME: ${DRY_RUN:+DRY-RUN ** }$*"
+}
+
+function info() { _log info INFO "$@"; }
+function warning() { _log warning WARNING "$@"; }
+function error() { _log err ERROR "$@"; }
+function fatal() { _log crit FATAL "$@"; exit 2; }
+
+# $1: file to test
+function file_is_flagged_kompot() {
+    local flag=$({ grep -I . "$1" || true; } |sed -n '1{p;q}')
+    [[ $flag == [#\;]kompot ]]
+}
+
+# $1: file to rename with a backup suffix
+function mv_dot_increment() {
+    local inc=
+    while :; do
+        REPLY="$1.bk${inc:+.$inc}"
+        [[ ! -e $REPLY ]] && break
+        (( inc++ ))
+    done
+    mv "$1" "$REPLY"
+}
+
+function has_journald() {
+    [[ -S /dev/log ]] && pgrep systemd-journal >/dev/null
+}
+
+function is_docker() {
+    [[ -f /.dockerenv || -f /run/.containerenv ]]
+}
+
+function explain() {
+    [[ -n $DRY_RUN ]] && info "RUN: ${*@Q}" && return 0
+    local REPLY=
+    "$@"; local ret=$?
+    case "$ret" in
+        0) info "RUN: ${*@Q} => OK${REPLY:+, $REPLY}" ;;
+        *) error "RUN: ${*@Q} => FAILED ($ret)${REPLY:+, $REPLY}" ;;
+    esac
+    return "$ret"
+}
+
+# Usage: persist-symlink [INSTALL_OPTS...] ORIGINAL-SOURCE MOVE-TO-DESTINATION
+# $1: (original) file, the source that will become a symlink
+# $2: persistent target, the new destiination where $1 is moved to
+#
+# Examples:
+# persist-symlink /etc/nagios /etc/kompot/nagios
+#     /etc/nagios becomes a symlink to /etc/kompot/nagios
+# persist-symlink /etc/rsyslog.conf /etc/kompot/rsyslog/rsyslog.conf
+#     /etc/rsyslog.conf becomes a symlink to /etc/kompot/rsyslog/rsyslog.conf
+function persist-symlink() {
+    REPLY=
+    local file=$1; shift
+    local target=$1; shift
+    [[ ${file: -1} == / ]] && { error "$FUNCNAME: File must not end with a /"; return 1; }
+    [[ ${target: -1} == / ]] && target+=${file##*/}
+    if [[ -L $file && $(readlink "$file") == "$target" ]]; then
+        REPLY=skip
+        return 0
+    fi
+    [[ -L $file ]] && { error "$FUNCNAME: File is already a symlink, operation unsupported"; return 1; }
+    if [[ -e $file ]]; then
+        mv_dot_increment "$file" || return 1 # new file in $REPLY
+	    mkdir -p "${target%/*}" || return 1
+	    cp -aTn "$REPLY" "$target" || return 1
+	    REPLY=
+    # else there will be a dead link because there is nothing to copy
+    # but file might (will) come later
+    fi
+    mkdir -p "${file%/*}" || return 1
+    ln -s "$target" "$file"
+}
+
+# Usage: install-dir [INSTALL_OPTS...] DESTINATION
+# $@: install -d options
+function install-dir() {
+    REPLY=
+    # abstract persist symlinks
+    local dst=$(readlink -m "${*: -1}")
+    install -d "${INSTALL_DIR_DEFAULTS[@]}" "${@:1:$#-1}" "$dst"
+}
+
+# Usage: install-file [INSTALL_OPTS...] [SOURCE] DESTINATION
+# If file exists, do not copy, unless source is flagged #kompot and
+# destination does not have the flag.
+function install-file() {
+    REPLY=
+    local install_opts=() allow_disable=
+    while [[ $1 == -* ]]; do
+        case "$1" in
+            --allow-disable) allow_disable=1; shift ;;
+            *) install_opts+=( "$1" "$2" ); shift 2 ;;
+        esac
+    done
+    (( $# == 1 )) && { create-file "${install_opts[@]}" "$1"; return $?; }
+    local src=$1; shift
+    local dst=$1; shift
+    [[ -f $src ]] || { error "$FUNCNAME: Source must be a file"; return 1; }
+    [[ ${dst: -1} == / ]] && dst+=${src##*/}
+
+    # abstract persist symlinks
+    dst=$(readlink -m "$dst")
+
+    # handle --allow-disable
+    if [[ -n $allow_disable ]]; then
+        if [[ $src == *.disabled ]]; then
+            # default (src) is disabled, file has been enabled
+            [[ -e ${dst%.disabled} ]] && dst=${dst%.disabled}
+        else
+            # default (src) is enabled, file has been disabled
+            [[ -e $dst.disabled ]] && dst=$dst.disabled
+        fi
+        if [[ -e ${dst%.disabled} && -e ${dst%.disabled}.disabled ]]; then
+            warning "Both ${dst%.disabled}{,.disabled} exists, only one should be there, please cleanup!"
+        fi
+    fi
+
+    if [[ ! -e $dst ]] || { file_is_flagged_kompot "$src" &&
+                          ! file_is_flagged_kompot "$dst"; }; then
+        if [[ -e $dst ]]; then
+            mv_dot_increment "$dst" || return 1
+            REPLY=override
+        fi
+        install -D "${INSTALL_FILE_DEFAULTS[@]}" "${install_opts[@]}" "$src" "$dst" || return 1
+    else
+        REPLY=skip
+    fi
+    return 0
+}
+
+# Usage: create-file [INSTALL_OPTS...] SOURCE DESTINATION
+# Touch the file is it does not exist.
+# Apply install-like options if given, -m -o, -g supported.
+function create-file() {
+    REPLY=
+    local mode= user= group=
+    while [[ $1 == -* ]]; do
+        case "$1" in
+            -m) mode=$2; shift 2 ;;
+            -o) user=$2; shift 2 ;;
+            -g) group=$2; shift 2 ;;
+        esac
+    done
+
+    # abstract persist symlinks
+    dst=$(readlink -m "$1")
+
+    [[ -e $dst ]] && { REPLY=skip; return 0; }
+    mkdir -p "${dst%/*}" || return 1
+    touch "$dst" || return 1
+    [[ -n $mode ]] && { chmod "$mode" "$dst" || return 1; }
+    [[ -n $user ]] && { chown "$user" "$dst" || return 1; }
+    [[ -n $group ]] && { chgrp "$group" "$dst" || return 1; }
+    return 0
+}
+
+function enable-file() {
+    REPLY=
+    [[ -f $1 ]] && { REPLY=skip; return 0; }
+    [[ -f $1.disabled ]] || return 1
+    mv "$1"{.disabled,}
+}
+
+# done when sourced
+(return 0 2>/dev/null) && return 0
+
+while (( $# > 0 )); do
+    case "$1" in
+        -n|--dry-run) DRY_RUN=1 ;;
+        -h|--help) exit_usage ;;
+        --) shift; break ;;
+        -*) exit_usage 1 ;;
+        *) break ;;
+    esac
+    shift
+done
+
+# /bin/env me?
+if (( $# > 0 )); then
+    ret=0
+    for i in "$@"; do
+        (PROGNAME=${i##*/} source "$i") || ret=$?
+    done
+    exit "$ret"
+fi
+
+# DOCKER PERSISTANCE
+
+if is_docker; then
+    # cron
+    explain persist-symlink /etc/cron.d/kompot.local /etc/kompot/cron/kompot.local
+
+    # grafana
+    explain persist-symlink /etc/grafana /etc/kompot/grafana
+    explain persist-symlink /var/lib/grafana /var/lib/kompot/grafana
+
+    # influxdb
+    explain persist-symlink /etc/influxdb /etc/kompot/influxdb
+    explain persist-symlink /var/lib/influxdb /var/lib/kompot/influxdb
+
+    # logrotate
+    explain persist-symlink /etc/logrotate.conf /etc/kompot/logrotate/logrotate.conf
+    explain persist-symlink /etc/logrotate.d /etc/kompot/logrotate/logrotate.d
+
+    # nagflux
+    explain persist-symlink /etc/nagflux /etc/kompot/nagflux
+
+    # nagios
+    explain persist-symlink /etc/nagios /etc/kompot/nagios
+    explain persist-symlink /var/spool/nagios /var/lib/kompot/nagios
+
+    # rsyslog
+    explain persist-symlink /etc/rsyslog.conf /etc/kompot/rsyslog/rsyslog.conf
+    explain persist-symlink /etc/rsyslog.d /etc/kompot/rsyslog/rsyslog.d
+
+    # snmp
+    explain persist-symlink /etc/snmp /etc/kompot/snmp
+
+    # ssh
+    for i in rsa ecdsa ed25519; do
+        if [[ ! -f /etc/kompot/ssh/ssh_host_${i}_key ]]; then
+            # service will trigger sshd-keygen from opensshd package and that script
+            # removes the symlinks, so let's make sure host keys are ready before
+            # switching to /etc/kompot/ssh symlinks
+            explain /usr/libexec/openssh/sshd-keygen "$i"
+        fi
+        explain persist-symlink "/etc/ssh/ssh_host_${i}_key" /etc/kompot/ssh/
+        explain persist-symlink "/etc/ssh/ssh_host_${i}_key.pub" /etc/kompot/ssh/
+    done
+    explain persist-symlink /root/.ssh/authorized_keys /etc/kompot/ssh/authorized_keys.root
+
+    # restore /var/log dirs in case it is a volume
+    while read -r u g m d; do
+        explain install-dir -o "$u" -g "$g" -m "$m" "$d"
+    done < "$KOMPOT_INSTALL_VAR_LOG_FILE"
+fi
+
+# INSTALL FILES
+
+# apache
+explain install-file /opt/kompot/share/configs/apache/kompot.conf /etc/httpd/conf.d/
+explain install-dir /etc/kompot/httpd/conf.d
+explain install-file /opt/kompot/share/samples/apache/defines.conf /etc/kompot/httpd/
+
+# bin
+explain install-dir /etc/kompot/bin
+
+# bash
+explain install-file /opt/kompot/share/configs/bash/kompot-alias.sh.disabled /etc/profile.d/
+explain install-file /opt/kompot/share/configs/bash/kompot-path.sh /etc/profile.d/
+
+# cron
+explain install-file /opt/kompot/share/configs/cron/kompot /etc/cron.d/
+explain install-file /etc/cron.d/kompot.local
+
+# drawio
+explain install-dir /etc/kompot/diagrams
+explain install-file --allow-disable /opt/kompot/share/samples/diagrams/BAIE.xml /etc/kompot/diagrams/
+
+# grafana
+explain install-file -m 640 -g grafana /opt/kompot/share/configs/grafana/grafana.ini /etc/grafana/
+
+# influxdb
+explain install-file /opt/kompot/share/configs/influxdb/influxdb.conf /etc/influxdb/
+
+# logrotate
+explain install-file /opt/kompot/share/configs/logrotate/logmatch /etc/logrotate.d/
+explain install-file /opt/kompot/share/configs/logrotate/rsyslog-network /etc/logrotate.d/
+
+# menus
+explain install-dir /etc/kompot/menus
+explain install-file --allow-disable /opt/kompot/share/samples/menus/200-drawio-rack.json /etc/kompot/menus/
+explain install-file --allow-disable /opt/kompot/share/samples/menus/title.txt /etc/kompot/menus/
+
+# nagflux
+explain install-file /opt/kompot/share/configs/nagflux/config.gcfg /etc/nagflux/
+
+# nagios
+explain install-file /opt/kompot/share/configs/nagios/cgi.cfg /etc/nagios/
+explain install-file /opt/kompot/share/configs/nagios/nagios.cfg /etc/nagios/
+explain install-file /opt/kompot/share/configs/nagios/resource.cfg /etc/nagios/
+explain install-dir /etc/kompot/nagios/credentials
+explain install-dir /etc/kompot/nagios/objects
+explain install-file --allow-disable /opt/kompot/share/samples/nagios/credentials-default.cfg /etc/kompot/nagios/credentials/default.cfg
+explain install-dir /etc/kompot/plugins
+explain install-dir -o nagios -g nagios /var/spool/nagios/nagfluxperfdata
+explain install-dir -o nagios -g nagios /var/spool/nagios/plugins-cache
+
+# nagzen
+explain install-dir /etc/kompot/nagzen
+explain install-file --allow-disable /opt/kompot/share/samples/nagzen/000_template.cfg /etc/kompot/nagzen/
+explain install-file --allow-disable /opt/kompot/share/samples/nagzen/inventory.xls /etc/kompot/nagzen/
+
+# rsyslog
+explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/10-listen-dev-log.conf.disabled /etc/rsyslog.d/
+explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/11-listen-udp.conf.disabled /etc/rsyslog.d/
+explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/12-listen-relp.conf.disabled /etc/rsyslog.d/
+explain install-file /opt/kompot/share/configs/rsyslog/18-omprog-check-pattern.conf /etc/rsyslog.d/
+explain install-file /opt/kompot/share/configs/rsyslog/19-archives.conf /etc/rsyslog.d/
+
+# snmp
+explain install-file /opt/kompot/share/configs/snmp/snmpd.local.conf /etc/snmp/
+explain install-file /opt/kompot/share/configs/snmp/snmptrapd.local.conf /etc/snmp/
+
+# ssh
+if is_docker; then
+    explain install-dir -m 700 -o root -g root /root/.ssh
+    explain install-file -m 600 -o root -g root /etc/kompot/ssh/authorized_keys.root
+fi
+
+# sudo
+explain install-file -m 400 /opt/kompot/share/configs/sudoers/nagios-handlers /etc/sudoers.d/
+
+# PREPARE SYSTEM AND SERVICES
+
+# timezone
+if is_docker; then
+    # configuration file /etc/kompot/system/timezone wins
+    tz=$TZ # try from environment
+    [[ -f /etc/kompot/system/timezone ]] && tz=$(< /etc/kompot/system/timezone)
+    if [[ -n $tz ]]; then
+        if [[ -f /usr/share/zoneinfo/$tz ]]; then
+            explain ln -snf "../usr/share/zoneinfo/$tz" /etc/localtime
+        else
+            warning 'Invalid value in /etc/kompot/system/timezone'
+        fi
+    fi
+fi
+
+# apache
+if is_docker; then
+    explain sed -i -re 's,^#(Define KOMPOT_REDIRECT_SLASH) .*,\1 1,' /etc/kompot/httpd/defines.conf
+fi
+explain usermod -aG nagios apache
+
+# bash
+if is_docker; then
+    explain enable-file /etc/profile.d/kompot-alias.sh
+fi
+
+# rsyslog
+if ! has_journald; then
+    explain enable-file /etc/rsyslog.d/10-listen-dev-log.conf
+    explain sed -i -re 's/^(module\(load="imjournal") [^c]/\1 config.enabled="off"/' /etc/rsyslog.conf
+fi
+[[ -d /var/lib/kompot/configs/logmatch/current ]] ||
+    explain sh -c 'update-passive build && APPLY_NO_RESTART=1 update-passive apply'
+
+# nagios
+[[ -d /var/lib/kompot/configs/nagios/current ]] ||
+    explain sh -c 'update-nagios build /etc/kompot/nagzen/* && APPLY_NO_RESTART=1 update-nagios apply'
+
+# snmptrapd
+[[ -d /var/lib/kompot/configs/snmptrapd/current ]] ||
+    explain sh -c 'update-snmptrapd build && APPLY_NO_RESTART=1 update-snmptrapd apply'
+
+# menus
+[[ -d /var/lib/kompot/configs/menus/current ]] ||
+    explain sh -c 'update-menus build && update-menus apply'
+
+# grafana
+explain sh -c 'CHECK_QUIET=1 /opt/kompot/share/configs/grafana/check-init-grafana'
+
+# MIGRATION
+
+info "Persistence version: ${KOMPOT_PERSIST_VERSION:-<none>}"
+info "Current version: ${KOMPOT_VERSION:-<error>}"
+[[ -n $KOMPOT_VERSION ]] || fatal 'Cannot find current version, abort migration check'
+
+function persist-version() {
+    echo "$KOMPOT_VERSION" > "$KOMPOT_PERSIST_VERSION_FILE"
+}
+
+[[ -z $KOMPOT_PERSIST_VERSION ]] && { persist-version; exit 0; }
+
+migration_scripts=($({
+        printf '2\tpersist\t%s\n' "$KOMPOT_PERSIST_VERSION"
+        printf '3\tcurrent\t%s\n' "$KOMPOT_VERSION"
+        if [[ -d /opt/kompot/share/migration ]]; then
+            find /opt/kompot/share/migration -executable -name 'to-kompot-*.sh' -printf '%p\n' |
+                sed -nre 's,^.*\/to-kompot-(.+)\.sh$,1\tscript\t\1\t\0,p'
+        fi
+    } |
+    sort -t $'\t' -k 3V,3 -k 1n,1 |
+    awk -F $'\t' '$2=="persist"{p=1;next} $2=="current"{exit} p==1{print $4}'))
+
+migration_missing=()
+for i in "${migration_scripts[@]}"; do
+    if [[ -n $migration_missing ]] || ! explain "$i"; then
+        migration_missing+=( "$i" )
+    fi
+done
+
+if [[ -n $migration_missing ]]; then
+    error 'Migration failed, run missing scripts manually:'
+    for (( i = 0; i < ${#migration_missing[@]}; i++ )); do
+        error "[$((i+1))] ${migration_missing[i]}"
+    done
+    exit 3
+fi
+
+persist-version
