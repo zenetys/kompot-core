@@ -126,13 +126,13 @@ function do_apply() {
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
-  [[ -e /var/lib/snmp/snmptrapd.local.conf ]] &&
-    cp --force "/var/lib/snmp/snmptrapd.local.conf" "${CFGDIR}/previous/"
-  cp --force "${CFGDIR}/current/snmptrapd.local.conf" "/var/lib/snmp/"
+  [[ -e ${SNMP_PERSISTENT_DIR}/snmptrapd.local.conf ]] &&
+    cp --force "${SNMP_PERSISTENT_DIR}/snmptrapd.local.conf" "${CFGDIR}/previous/"
+  cp --force "${CFGDIR}/current/snmptrapd.local.conf" "${SNMP_PERSISTENT_DIR}/"
 
   systemctl stop snmptrapd
-  [[ -f /var/lib/snmp/snmptrapd.conf ]] &&
-    sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
+  [[ -f ${SNMP_PERSISTENT_DIR}/snmptrapd.conf ]] &&
+    sed -i '/^usmUser /d' ${SNMP_PERSISTENT_DIR}/snmptrapd.conf
   systemctl start snmptrapd
   systemctl restart snmptrapd
 
@@ -150,17 +150,17 @@ function do_revert() {
     debug "Disable current ${CFGDIR}/$(readlink ${CFGDIR}/current)"
     [[ -L ${CFGDIR}/old ]] && rm ${CFGDIR}/old
     mv ${CFGDIR}/current ${CFGDIR}/old
-    cp --force "/var/lib/snmp/snmptrapd.local.conf" ${CFGDIR}/old/
+    cp --force "${SNMP_PERSISTENT_DIR}/snmptrapd.local.conf" ${CFGDIR}/old/
     info "Old configuration linked to ${CFGDIR}/old"
   fi
 
   info "Previous configuration applied and linked to ${CFGDIR}/current"
   mv ${CFGDIR}/previous ${CFGDIR}/current
-  cp --force "${CFGDIR}/current/snmptrapd.local.conf" /var/lib/snmp/
+  cp --force "${CFGDIR}/current/snmptrapd.local.conf" "${SNMP_PERSISTENT_DIR}/"
 
   systemctl stop snmptrapd
-  [[ -f /var/lib/snmp/snmptrapd.conf ]] &&
-    sed -i '/^usmUser /d' /var/lib/snmp/snmptrapd.conf
+  [[ -f ${SNMP_PERSISTENT_DIR}/snmptrapd.conf ]] &&
+    sed -i '/^usmUser /d' ${SNMP_PERSISTENT_DIR}/snmptrapd.conf
   systemctl start snmptrapd
   systemctl restart snmptrapd
 
@@ -169,6 +169,10 @@ function do_revert() {
 declare VERBOSE=${VERBOSE:-1}
 declare BASEDIR=${BASEDIR:-/var/lib/configs/snmptrapd}
 declare CFGDIR=${BASEDIR}
+
+default_snmp_persistent_dir=/var/lib/net-snmp
+[[ ! -d $default_snmp_persistent_dir/. && -d /var/lib/snmp/. ]] && default_snmp_persistent_dir=/var/lib/snmp
+declare SNMP_PERSISTENT_DIR=${SNMP_PERSISTENT_DIR:-$default_snmp_persistent_dir}
 
 export PATH=${PATH}:${0%/*}
 
