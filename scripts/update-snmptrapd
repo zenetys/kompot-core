@@ -130,11 +130,11 @@ function do_apply() {
     cp --force "${SNMP_PERSISTENT_DIR}/snmptrapd.local.conf" "${CFGDIR}/previous/"
   cp --force "${CFGDIR}/current/snmptrapd.local.conf" "${SNMP_PERSISTENT_DIR}/"
 
-  systemctl stop snmptrapd
+  zservice stop snmptrapd
   [[ -f ${SNMP_PERSISTENT_DIR}/snmptrapd.conf ]] &&
     sed -i '/^usmUser /d' ${SNMP_PERSISTENT_DIR}/snmptrapd.conf
-  systemctl start snmptrapd
-  systemctl restart snmptrapd
+  zservice start snmptrapd
+  zservice restart snmptrapd
 
   info "New configuration applied and linked to ${CFGDIR}/current"
 }
@@ -158,11 +158,11 @@ function do_revert() {
   mv ${CFGDIR}/previous ${CFGDIR}/current
   cp --force "${CFGDIR}/current/snmptrapd.local.conf" "${SNMP_PERSISTENT_DIR}/"
 
-  systemctl stop snmptrapd
+  zservice stop snmptrapd
   [[ -f ${SNMP_PERSISTENT_DIR}/snmptrapd.conf ]] &&
     sed -i '/^usmUser /d' ${SNMP_PERSISTENT_DIR}/snmptrapd.conf
-  systemctl start snmptrapd
-  systemctl restart snmptrapd
+  zservice start snmptrapd
+  zservice restart snmptrapd
 
 }
 
