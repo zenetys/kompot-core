@@ -167,7 +167,7 @@ function do_revert() {
 }
 
 declare VERBOSE=${VERBOSE:-1}
-declare BASEDIR=${BASEDIR:-/var/lib/configs/snmptrapd}
+declare BASEDIR=${BASEDIR:-/var/lib/kompot/configs/snmptrapd}
 declare CFGDIR=${BASEDIR}
 
 default_snmp_persistent_dir=/var/lib/net-snmp
