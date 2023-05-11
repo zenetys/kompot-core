@@ -1,0 +1,1 @@
+30 4 * * * nagios find /var/log/nagios/archives/ -mindepth 1 -maxdepth 1 -type f -name '*.log' -mtime +10 -delete; find /var/log/nagios/archives/ -mindepth 1 -maxdepth 1 -type f -name '*.log' -exec xz -9 {} \;
