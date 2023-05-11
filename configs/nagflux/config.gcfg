@@ -1,10 +1,10 @@
 [main]
-    NagiosSpoolfileFolder = "/var/spool/nagflux"
+    NagiosSpoolfileFolder = "/var/spool/nagios/nagfluxperfdata"
     NagiosSpoolfileWorker = 1
     InfluxWorker = 2
     MaxInfluxWorker = 5
     DumpFile = "nagflux.dump"
-    NagfluxSpoolfileFolder = "/var/lib/nagflux"
+    NagfluxSpoolfileFolder = "/var/spool/nagflux"
     FieldSeparator = "&"
     BufferSize = 10000
     FileBufferSize = 65536
