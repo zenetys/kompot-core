@@ -86,35 +86,41 @@ function version() {
 
 CONFIG_HEADER='{
   "title": "%TITLE%",
-  "menu": [ {
+  "menu": [
+    {
       "name": "Bac à état",
       "url": "/panel",
       "icon": "mdi-table",
       "type": "div"
-    },{
-      "name": "Schéma de baie",
-      "url": "/drawio/drawio-app/?offline=1&lightbox=1&splash=0&toolbar=0#UBAIE",
-      "icon": "mdi-graph-outline",
-      "type": "frame"
-    },{
+    }'
+
+IPSLA_HEADER='
+    {
       "name": "IPSLA",
       "icon": "mdi-chart-bar",
       "type": "rrdmenu",
-      "subMenus": [
-'
+      "subMenus": ['
 
 # X-ACTION build: build config from operational monitoring
 function do_build() {
   local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
-  local first=1
+  local title first=1 ipsla_build
 
   mkdir -p $cfgdir
   debug "Create conf.d to '$cfgdir'"
 
-  printf "%s" "$CONFIG_HEADER" > $cfgdir/config.json
-  sed -i "s/%TITLE%/${HOSTNAME%%-*}/" $cfgdir/config.json
+  [[ -r $USERDIR/title.txt ]] && title=$(< "$USERDIR/title.txt")
+  [[ -z $title ]] && title=${HOSTNAME%%.*}
+  title=$(echo "$title" |sed -zre 's,[[:cntrl:]]+, ,g; s,\s+$,,; s,^\s+,,')
+  { echo "$CONFIG_HEADER" |sed "s/%TITLE%/$title/"
+    find "$USERDIR/" -mindepth 1 -maxdepth 1 -type f -name '*.json' |
+        while read -r; do
+      printf ",\n"
+      cat "$REPLY" >> "$cfgdir/config.json"
+    done
+  } > "$cfgdir/config.json"
 
-  HEADERS=host_name,service_description,__IPSLA_PEER naglive |
+  ipsla_build=$(HEADERS=host_name,service_description,__IPSLA_PEER naglive |
        grep -E '\W+IPSLA-\w+\W+' | sort -k3 | while read hst svc site; do
     [[ $first == 1 ]] || printf ",\n"
     first=0
@@ -125,9 +131,15 @@ function do_build() {
     printf '"datasources": ["RTTMin","AvgJitter","pktLoss"]'
     printf '}'
     echo ", ok" >&2
-  done >> $cfgdir/config.json
+  done)
 
-  printf "\n      ]\n    }\n  ]\n}\n" >> $cfgdir/config.json
+  if [[ -n $ipsla_build ]]; then
+    echo "$IPSLA_HEADER"
+    echo "$ipsla_build"
+    printf '      ]\n    }\n'
+  fi >> "$cfgdir/config.json"
+
+  printf "  ]\n}\n" >> $cfgdir/config.json
 
   # validate link to new config
   ln -snf ${cfgdir##*/} ${CFGDIR}/new
@@ -173,6 +185,7 @@ function do_revert() {
 }
 
 declare VERBOSE=${VERBOSE:-1}
+declare USERDIR=${USERDIR:-/etc/kompot/menus}
 declare BASEDIR=${BASEDIR:-/var/lib/kompot/configs/menus}
 declare CFGDIR=${BASEDIR}
 
