@@ -1,3 +1,6 @@
+-- Test OK on grafana 9.2.4
+-- Test OK on grafana 9.5.2
+
 insert into dashboard (
     id, version, slug, title,
     org_id, created, updated, updated_by, created_by, gnet_id, plugin_id, folder_id,

@@ -1,3 +1,6 @@
+-- Test OK on grafana 9.2.4
+-- Test OK on grafana 9.5.2
+
 insert into role (
     id, name, description, version, org_id, uid,
     created, updated, display_name, group_name, hidden

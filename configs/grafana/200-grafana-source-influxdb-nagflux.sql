@@ -1,3 +1,6 @@
+-- Test OK on grafana 9.2.4
+-- Test OK on grafana 9.5.2
+
 insert into data_source (
     id, org_id, version, type, name, access, url, password, user,
     database, basic_auth, basic_auth_user, basic_auth_password, is_default,
