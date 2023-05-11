@@ -15,11 +15,13 @@ fi
 
 if [[ $RESET == 1 ]]; then
     zservice stop grafana-server
-    dpkg -r grafana
-    rm -rfv /etc/grafana /var/lib/grafana
-    dpkg -i /media/packages/grafana*.deb
+    rpm -e --nodeps grafana
+    find /var/lib/grafana/ -mindepth 1 -maxdepth 1 -exec rm -rfv {} +
+    rm -rfv /etc/grafana
+    dnf install -y grafana
 fi
 
+zservice start grafana-server
 ts=$(date +%s)
 wait=0
 last_size=
