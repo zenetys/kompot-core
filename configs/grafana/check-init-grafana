@@ -22,14 +22,33 @@ fi
 
 ts=$(date +%s)
 wait=0
+last_size=
+last_migration=
+size_stable=0
+migration_stable=0
 
-while (( wait++ < 30 )); do
-    sz=($(stat -c %s /var/lib/grafana/grafana.db) "${sz[@]}")
-    (( $? == 0 && sz[0] == sz[1] && sz[1] == sz[2] )) && { wait=0; break; }
-    info "database not ready, try $wait, wait"
+while (( wait++ < 90 )); do
+    info "Wait database ready, try=$wait, size_stable=$size_stable, migration_stable=$migration_stable"
     sleep 1
+    [[ -f /var/lib/grafana/grafana.db ]] || continue
+    cur_size=$(stat -c %s /var/lib/grafana/grafana.db 2>/dev/null)
+    cur_migration=$(sqlite3 /var/lib/grafana/grafana.db 'select max(id) from migration_log' 2>/dev/null)
+    if [[ $cur_migration == $last_migration ]]; then
+        (( migration_stable++ ))
+    else
+        last_migration=$cur_migration
+        migration_stable=0
+    fi
+    if [[ $cur_size == $last_size ]]; then
+        (( size_stable++ ))
+    else
+        last_size=$cur_size
+        size_stable=0
+    fi
+    (( migration_stable > 8 && size_stable > 8 )) && { wait=0; break; }
 done
-(( wait == 0 )) || fatal 'database not ready, timeout'
+(( wait == 0 )) || fatal 'Database not ready, timeout'
+
 info 'Stop grafana'
 zservice stop grafana-server
 
