@@ -24,7 +24,7 @@
     # tcp or file
     Type = "file"
     # tcp: 127.0.0.1:6557 or file /var/run/live
-    Address = "/var/lib/nagios4/rw/live.socket"
+    # Address = "/var/spool/nagios/cmd/live.sock"
     # The amount to minutes to wait for livestatus to come up, if set to 0 the detection is disabled
     MinutesToWait = 2
     # Set the Version of Livestatus. Allowed are Nagios, Icinga2, Naemon.
