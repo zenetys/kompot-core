@@ -20,6 +20,10 @@
     # List of Severities https://godoc.org/github.com/kdar/factorlog#Severity
     MinSeverity = "INFO"
 
+[Monitoring]
+    # leave empty to disable
+    # PrometheusAddress = ":8080"
+
 [Livestatus]
     # tcp or file
     Type = "file"
@@ -30,6 +34,18 @@
     # Set the Version of Livestatus. Allowed are Nagios, Icinga2, Naemon.
     # If left empty Nagflux will try to detect it on it's own, which will not always work.
     Version = "Nagios"
+
+[ModGearman "example"] #copy this block and rename it to add a second ModGearman queue
+    Enabled = false
+    Address = "127.0.0.1:4730"
+    Queue = "perfdata"
+    # Leave Secret and SecretFile empty to disable encryption
+    # If both are filled the the Secret will be used
+    # Secret to encrypt the gearman jobs
+    Secret = ""
+    # Path to a file which holds the secret to encrypt the gearman jobs
+    SecretFile = "/etc/mod-gearman/secret.key"
+    Worker = 1
 
 [InfluxDBGlobal]
     CreateDatabaseIfNotExists = true
@@ -51,6 +67,19 @@
     Address = "http://127.0.0.1:8086"
     Arguments = "precision=ms&u=root&p=root&db=fast"
     StopPullingDataIfDown = false
+
+[ElasticsearchGlobal]
+    HostcheckAlias = "hostcheck"
+    NumberOfShards = 1
+    NumberOfReplicas = 1
+    # Sorts the indices "monthly" or "yearly"
+    IndexRotation = "monthly"
+
+[Elasticsearch "example"]
+    Enabled = false
+    Address = "http://localhost:9200"
+    Index = "nagflux"
+    Version = 2.1
 
 [JSONFileExport "one"]
     Enabled = false
