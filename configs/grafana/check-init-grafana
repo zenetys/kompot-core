@@ -18,7 +18,7 @@ if [[ $RESET == 1 ]]; then
     rpm -e --nodeps grafana
     find /var/lib/grafana/ -mindepth 1 -maxdepth 1 -exec rm -rfv {} +
     rm -rfv /etc/grafana
-    dnf install -y grafana
+    dnf install -y "grafana${GRAFANA_VERSION:+-$GRAFANA_VERSION}"
 fi
 
 zservice start grafana-server
