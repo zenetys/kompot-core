@@ -3,6 +3,7 @@
           rotate 31
           daily
           olddir archives
+          createolddir 750 root adm
           dateext
           missingok
           compress
