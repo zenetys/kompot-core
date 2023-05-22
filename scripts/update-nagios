@@ -219,6 +219,7 @@ function do_build() {
     fi
   done # for file
 
+  # FIXME: specific
   for equipement in ${!IPSEC[@]}; do
     PARAMS=(
       "CTRL-ETAT-IPSEC"
