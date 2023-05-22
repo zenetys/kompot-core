@@ -13,6 +13,9 @@ if [[ -f /var/lib/grafana/grafana.db ]]; then
     fi
 fi
 
+zservice status grafana-server >/dev/null
+initial_service_status=$?
+
 if [[ $RESET == 1 ]]; then
     zservice stop grafana-server
     rpm -e --nodeps grafana
@@ -67,5 +70,7 @@ info 'Update configuration'
 cp -a /etc/grafana/grafana.ini{,".$ts"}
 install -m 640 -g grafana /opt/kompot/share/configs/grafana/grafana.ini /etc/grafana/grafana.ini
 
-info 'Start grafana'
-zservice start grafana-server
+if [[ $initial_service_status == 0 ]]; then
+    info 'Start grafana'
+    zservice start grafana-server
+fi
