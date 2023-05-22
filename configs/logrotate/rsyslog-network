@@ -10,6 +10,6 @@
           nodelaycompress
           sharedscripts
           postrotate
-                    /usr/lib/rsyslog/rsyslog-rotate
+                    killall -s HUP rsyslogd
           endscript
 }
