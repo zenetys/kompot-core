@@ -129,6 +129,7 @@ function do_build() {
 
           [[ $continue ]] && echo "CONTINUE"
           [[ $disabled ]] && echo "DISABLED"
+          # FIXME: specific
           [[ ${rewrite_hostname:0:4} == CO1- ]] && rewrite_hostname="${HOSTNAME%-*}-${rewrite_hostname#*-}"
           [[ $rewrite_hostname ]]     && echo "ATTR:NAGIOS_FORCED_HOST \"$rewrite_hostname\""
           [[ $service ]]  && echo "ATTR:NAGIOS_FORCED_SERVICE \"$service\""
