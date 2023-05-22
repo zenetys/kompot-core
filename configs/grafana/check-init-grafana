@@ -41,17 +41,7 @@ done
 
 info 'Update configuration'
 cp -a /etc/grafana/grafana.ini{,".$ts"}
-awk '
-{ comment = 0; key = ""; value = ""; }
-match($0, /^\s*\[([^\]]+)\]/, cap) { section = cap[1]; print $0; next; }
-match($0, /^\s*(;\s*)?([^[:space:]=]+)[^=]*=\s*(.*)/, cap) { comment = cap[1]?1:0; key = cap[2]; value = cap[3]; }
-section == "server" && key == "http_addr" { print key " = 127.0.0.1"; next; }
-section == "server" && key == "root_url" { print key " = /grafana"; next; }
-section == "auth.anonymous" && key == "enabled" { print key " = true"; next; }
-section == "auth.anonymous" && key == "org_role" { print key " = Viewer"; next; }
-section == "users" && key == "default_theme" { print key " = light"; next; }
-{ print $0; }
-' "/etc/grafana/grafana.ini.$ts" > /etc/grafana/grafana.ini
+install -m 640 -g grafana /opt/kompot/share/configs/grafana/grafana.ini /etc/grafana/grafana.ini
 
 info 'Start grafana'
 systemctl start grafana-server
