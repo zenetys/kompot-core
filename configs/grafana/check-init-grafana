@@ -1,7 +1,15 @@
 #!/bin/bash
 PROGNAME=${0##*/}
-fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
-info() { echo "INFO: $PROGNAME: $*" >&2; }
+
+function _log() {
+    local now=$(date +%Y-%m-%dT%H:%M:%S.%3N%:z)
+    local LOGGER_SEVERITY=${LOGGER_SEVERITY:-info}
+    local STDOUT_LABEL=${STDOUT_LABEL:-INFO}
+    [[ -t 0 ]] || logger -t "$PROGNAME[$$]" -p "$LOGGER_SEVERITY" -- "$*"
+    echo "$now $STDOUT_LABEL $PROGNAME: $*"
+}
+function info() { LOGGER_SEVERITY=info STDOUT_LABEL=INFO _log "$@"; }
+function fatal() { LOGGER_SEVERITY=crit STDOUT_LABEL=FATAL _log "$@"; exit 2; }
 
 source /etc/profile.d/kompot-path.sh ||
     fatal 'Failed to source /etc/profile.d/kompot-path.sh'
