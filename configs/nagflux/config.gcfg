@@ -1,3 +1,5 @@
+#kompot
+
 [main]
     NagiosSpoolfileFolder = "/var/spool/nagios/nagfluxperfdata"
     NagiosSpoolfileWorker = 1
