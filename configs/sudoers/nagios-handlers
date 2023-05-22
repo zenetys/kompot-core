@@ -1,1 +1,1 @@
-nagios ALL=(ALL) NOPASSWD: /opt/nag4you/scripts/update-snmpuser-entry
+nagios ALL=(ALL) NOPASSWD: /opt/kompot/bin/update-snmpuser-entry
