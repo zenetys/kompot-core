@@ -85,4 +85,9 @@ function htmlEntities(s) {
   return (s.replace(/([&<>\"'])/g, m => entities[m]));
 }
 
-
+function color(status) {
+  let sha=[0,2,4,0,7,0,0,0,9,0,0,0,0,0,0,0,0];
+  let ssa=[0,1,3,0,5,0,0,0,8,0,0,0,0,0,0,0,6];
+  let st=ssa[status];
+  return(st<=2?"grey":st<=4?"green":st<=5?"yellow":st<=7?"red":"orange");
+}
