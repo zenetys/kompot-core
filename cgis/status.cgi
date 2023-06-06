@@ -316,7 +316,7 @@ BEGIN {
   }
   # printf("[DEBUG] filter=%s (QS=%s)\n", filter, QUERY_STRING) > "/dev/stderr";
 
-  if (substr(ENVIRON["REQUEST_URI"], 1, 5) == "/api/") {
+  if (substr(ENVIRON["REQUEST_URI"], 1, length(ENVIRON["KOMPOT_BASEURL"]) + 4) == (ENVIRON["KOMPOT_BASEURL"] "api/")) {
     if (ENVIRON["SCRIPT_NAME"]) {
       printf("Status: 200\r\n");
       printf("Content-Type: application/json\r\n");
