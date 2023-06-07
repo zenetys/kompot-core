@@ -84,6 +84,10 @@ function version() {
   echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
 }
 
+function lastlog() {
+    tail -n 1000 /var/log/messages |fgrep ' rsyslogd: ' |tail -n 30
+}
+
 # X-ACTION build <filename.xls>: build config with input filename.xls
 function do_build() {
   local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
@@ -158,7 +162,7 @@ function do_apply() {
   killall logmatch
   sleep 3
   if ! killall -0 logmatch 2>/dev/null; then
-    journalctl -n 30 --no-pager --unit rsyslog.service
+    lastlog
     warning "Rollback to the old logmatch configuration"
     do_revert
     return 1
@@ -187,7 +191,7 @@ function do_revert() {
   killall -0 logmatch 2>/dev/null && killall logmatch
   sleep 3
   if ! killall -0 logmatch 2>/dev/null; then
-    journalctl -n 30 --no-pager --unit rsyslog.service
+    lastlog
     fatal "Rollback failed, no active configuration running"
   fi
 }
