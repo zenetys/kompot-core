@@ -84,6 +84,11 @@ function version() {
   echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
 }
 
+function _naglive() {
+    zservice status nagios >/dev/null || return 1
+    naglive "$@"
+}
+
 # X-ACTION build: build config from operational monitoring
 function do_build() {
   local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
@@ -92,7 +97,7 @@ function do_build() {
   mkdir -p $cfgdir
   debug "Create conf.d to '$cfgdir'"
 
-  naglive | grep -E '\W+ACCES-SNMP\W+' | while read hostname rest; do
+  _naglive | grep -E '\W+ACCES-SNMP\W+' | while read hostname rest; do
     echo -n "$hostname: " >&2
     eval "set -- $(nagcc --exec $hostname ACCES-SNMP snmptrapd-createUser) "
     [[ $1 != createUser ]] && echo "bypass" >&2 && continue
