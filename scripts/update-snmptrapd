@@ -135,6 +135,8 @@ function do_apply() {
     cp --force "${SNMP_PERSISTENT_DIR}/snmptrapd.local.conf" "${CFGDIR}/previous/"
   cp --force "${CFGDIR}/current/snmptrapd.local.conf" "${SNMP_PERSISTENT_DIR}/"
 
+  [[ -n $APPLY_NO_RESTART ]] && return 0
+
   zservice stop snmptrapd
   [[ -f ${SNMP_PERSISTENT_DIR}/snmptrapd.conf ]] &&
     sed -i '/^usmUser /d' ${SNMP_PERSISTENT_DIR}/snmptrapd.conf
