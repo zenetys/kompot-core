@@ -34,7 +34,15 @@ if [[ $RESET == 1 ]]; then
     dnf install -y "grafana${GRAFANA_VERSION:+-$GRAFANA_VERSION}"
 fi
 
-zservice start grafana-server
+# start grafana if not already running to make it initialize its database
+if ! zservice status grafana-server >/dev/null; then
+    info 'Start grafana'
+    zservice start grafana-server
+fi
+sleep 1
+zservice status grafana-server >/dev/null ||
+    fatal 'Service grafana-server did not start'
+
 ts=$(date +%s)
 wait=0
 last_size=
