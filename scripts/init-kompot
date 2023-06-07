@@ -1,0 +1,88 @@
+#!/usr/bin/bash
+
+PROGNAME=${0##*/}
+export PATH="$PATH:${0%/*}"
+
+SERVICES=(
+    rsyslog
+    sshd
+    crond
+    snmpd
+    snmptrapd
+    influxdb
+    nagflux
+    nagios
+    grafana-server
+    httpd
+)
+
+declare -A DO_NOT_STOP_SERVICES=(
+    [sshd]=1
+)
+
+ALL=
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ "$status" != "0" ]] && exec >&2
+    echo "\
+Usage: $PROGNAME [--all] start|stop|restart|condrestart
+Kompot global init script to start or stop all services
+
+Available options:
+  --all             Do not skip protected services on stop
+  -h, --help        Display this help.
+"
+    echo 'Services:'
+    echo "${SERVICES[@]}" |fold -s -w 50 |sed 's,^,  ,'
+    echo 'Services NOT stopped unless --all is given:'
+    echo "${!DO_NOT_STOP_SERVICES[@]}" |fold -s -w 50 |sed 's,^,  ,'
+    exit "$status"
+}
+
+function do_start() {
+    local retval=0
+    for i in "${SERVICES[@]}"; do
+        zservice start "$i" || retval=1
+    done
+    return "$retval"
+}
+
+function do_stop() {
+    local retval=0
+    for (( i = ${#SERVICES[@]} - 1; i >= 0; i-- )) do
+        [[ -z $ALL && -n ${DO_NOT_STOP_SERVICES[${SERVICES[i]}]} ]] && continue
+        zservice stop "${SERVICES[i]}" || retval=1
+    done
+    return "$retval"
+}
+
+function do_restart() {
+    local retval=0
+    do_stop || retval=1
+    do_start || retval=1
+    return "$retval"
+}
+
+function do_condrestart() {
+    local retval=0
+    for (( i = 0; i < ${#SERVICES[@]}; i++ )) do
+        [[ -z $ALL && -n ${DO_NOT_STOP_SERVICES[${SERVICES[i]}]} ]] && continue
+        zservice condrestart "${SERVICES[i]}" || retval=1
+    done
+    return "$retval"
+}
+
+while (( $# > 0 )); do
+    case "$1" in
+        --all) ALL=1 ;;
+        -h|--help) exit_usage 0 ;;
+        *) break ;;
+    esac
+    shift
+done
+
+ACTION=$1; shift
+declare -f -F "do_$ACTION" >/dev/null || exit_usage 1
+
+"do_$ACTION"
