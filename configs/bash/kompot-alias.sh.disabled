@@ -1,0 +1,6 @@
+alias ls='ls --color'
+alias cp='cp -iv'
+alias ll='ls -l'
+alias mv='mv -iv'
+alias rm='rm -iv'
+alias rmdir='rmdir -v'
