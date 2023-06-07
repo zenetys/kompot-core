@@ -17,11 +17,11 @@ host=$1
 [[ -z $host ]] && exit 1
 
 if [[ $MODE == HARD ]]; then
-  systemctl stop nagios4
+  zservice stop nagios
   awk -v NAME="$host" '{if (substr($0,1,10) == "host_name=" && substr($0,11) == NAME) A=1; else if ($0 == "}") A=0; if (A == 1 && substr($0,1,2) == "__") next ; print $0 ; }' < /var/spool/nagios/retention.dat > /var/spool/nagios/retention.dat.new &&
     chown --reference=/var/spool/nagios/retention.dat /var/spool/nagios/retention.dat.new &&
     mv /var/spool/nagios/retention.dat{.new,}
-  systemctl start nagios4
+  zservice start nagios
   exit 0
 fi
 
