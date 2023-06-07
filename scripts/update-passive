@@ -160,6 +160,9 @@ function do_apply() {
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
+
+  [[ -n $APPLY_NO_RESTART ]] && return 0
+
   killall logmatch
   sleep 3
   if ! killall -0 logmatch 2>/dev/null; then
