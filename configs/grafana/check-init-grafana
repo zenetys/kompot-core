@@ -9,7 +9,7 @@ source /etc/profile.d/kompot-path.sh ||
 if [[ -f /var/lib/grafana/grafana.db ]]; then
     ndashboard=$(sqlite3 /var/lib/grafana/grafana.db 'select count(*) from dashboard')
     if [[ $ndashboard -gt 0 && $FORCE != 1 ]]; then
-        info 'Database not empty, need force to continue'
+        [[ -z $CHECK_QUIET ]] && info 'Database not empty, need force to continue'
         exit 0
     fi
 fi
