@@ -247,6 +247,9 @@ function do_apply() {
   [[ -L ${CFGDIR}/previous ]] && rm ${CFGDIR}/previous
   [[ -L ${CFGDIR}/current ]] && mv ${CFGDIR}/current ${CFGDIR}/previous
   mv ${CFGDIR}/new ${CFGDIR}/current
+
+  [[ -n $APPLY_NO_RESTART ]] && return 0
+
   zservice restart nagios
   sleep 1
   if ! zservice status nagios >/dev/null; then
