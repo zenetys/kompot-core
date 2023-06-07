@@ -7,8 +7,8 @@ function set-threshold() {
   local crit=$1; shift
 
   if naglive "$host" "$service" > /dev/null; then
-    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_WARNING;$warn" >> /var/lib/nagios4/rw/nagios.cmd
-    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_CRITICAL;$crit" >> /var/lib/nagios4/rw/nagios.cmd
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_WARNING;$warn" >> /var/spool/nagios/cmd/nagios.cmd
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_CRITICAL;$crit" >> /var/spool/nagios/cmd/nagios.cmd
   fi
 }
 
@@ -18,9 +18,9 @@ host=$1
 
 if [[ $MODE == HARD ]]; then
   systemctl stop nagios4
-  awk -v NAME="$host" '{if (substr($0,1,10) == "host_name=" && substr($0,11) == NAME) A=1; else if ($0 == "}") A=0; if (A == 1 && substr($0,1,2) == "__") next ; print $0 ; }' < /var/lib/nagios4/retention.dat > /var/lib/nagios4/retention.dat.new &&
-    chown --reference=/var/lib/nagios4/retention.dat /var/lib/nagios4/retention.dat.new &&
-    mv /var/lib/nagios4/retention.dat{.new,}
+  awk -v NAME="$host" '{if (substr($0,1,10) == "host_name=" && substr($0,11) == NAME) A=1; else if ($0 == "}") A=0; if (A == 1 && substr($0,1,2) == "__") next ; print $0 ; }' < /var/spool/nagios/retention.dat > /var/spool/nagios/retention.dat.new &&
+    chown --reference=/var/spool/nagios/retention.dat /var/spool/nagios/retention.dat.new &&
+    mv /var/spool/nagios/retention.dat{.new,}
   systemctl start nagios4
   exit 0
 fi

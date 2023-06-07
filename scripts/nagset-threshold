@@ -7,8 +7,8 @@ function nagset-threshold() {
   local crit=$1; shift
 
   if nagcc "$host" "$service" > /dev/null; then
-    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_WARNING;$warn" >> /var/lib/nagios4/rw/nagios.cmd
-    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_CRITICAL;$crit" >> /var/lib/nagios4/rw/nagios.cmd
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_WARNING;$warn" >> /var/spool/nagios/cmd/nagios.cmd
+    echo "[$(date +%s)] CHANGE_CUSTOM_SVC_VAR;$host;$service;_CRITICAL;$crit" >> /var/spool/nagios/cmd/nagios.cmd
     echo OK >&2
   fi
   exit 1
