@@ -84,6 +84,11 @@ function version() {
   echo "${PROGFILE##*/} $VERSION - $AUTHOR - $LICENSE"
 }
 
+function _naglive() {
+    zservice status nagios >/dev/null || return 1
+    naglive "$@"
+}
+
 CONFIG_HEADER='{
   "title": "%TITLE%",
   "menu": [
@@ -120,7 +125,7 @@ function do_build() {
     done
   } > "$cfgdir/config.json"
 
-  ipsla_build=$(HEADERS=host_name,service_description,__IPSLA_PEER naglive |
+  ipsla_build=$(HEADERS=host_name,service_description,__IPSLA_PEER _naglive |
        grep -E '\W+IPSLA-\w+\W+' | sort -k3 | while read hst svc site; do
     [[ $first == 1 ]] || printf ",\n"
     first=0
