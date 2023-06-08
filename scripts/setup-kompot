@@ -424,6 +424,20 @@ fi
 # grafana
 explain sh -c 'CHECK_QUIET=1 /opt/kompot/share/configs/grafana/check-init-grafana'
 
+# enable services at boot time
+if ! is_docker; then
+    systemctl enable crond
+    systemctl enable grafana-server
+    systemctl enable httpd
+    systemctl enable influxdb
+    systemctl enable nagflux
+    systemctl enable nagios
+    systemctl enable rsyslog
+    systemctl enable snmpd
+    systemctl enable snmptrapd
+    systemctl enable sshd
+fi
+
 # MIGRATION
 
 info "Persistence version: ${KOMPOT_PERSIST_VERSION:-<none>}"
