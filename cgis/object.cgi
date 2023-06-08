@@ -115,6 +115,7 @@ function servicelist() {
       block = 1;
       if (section == SERVICEDEF && section != new) {
         printf("\n%s}\n", L3);
+        host_name = "";
       }
       section = new;
       # printf("[DEBUG] start block(%s)\n", section) >> "/dev/stderr";
