@@ -21,7 +21,7 @@ function fatal() {
 }
 
 function get-service-platform() {
-    local initcmd=$(ps -e -q 1 --no-headers -o comm)
+    local initcmd=$(ps -q 1 --no-headers -o comm)
     if [[ $initcmd == systemd ]]; then
         REPLY=systemd
         return 0
