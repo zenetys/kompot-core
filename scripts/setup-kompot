@@ -79,6 +79,12 @@ function is_docker() {
     [[ -f /.dockerenv || -f /run/.containerenv ]]
 }
 
+function rpm_verify_file() {
+    local file=$1; shift
+    rpm --verify --nomtime --nodeps -f "$file" |
+        awk -v "file=$file" '$NF == file && $1 ~ /[S5]/ {exit 1}';
+}
+
 function explain() {
     [[ -n $DRY_RUN ]] && info "RUN: ${*@Q}" && return 0
     local REPLY=
@@ -401,6 +407,11 @@ fi
 # nagios
 [[ -d /var/lib/kompot/configs/nagios/current ]] ||
     explain sh -c 'update-nagios build /etc/kompot/nagzen/* && APPLY_NO_RESTART=1 update-nagios apply'
+
+# snmpd
+if is_docker || rpm_verify_file /etc/snmp/snmpd.conf; then
+    explain sed -i -re 's,^(\s*com2sec\s+notConfigUser\s+default\s+public\>),#\1,' /etc/snmp/snmpd.conf
+fi
 
 # snmptrapd
 [[ -d /var/lib/kompot/configs/snmptrapd/current ]] ||
