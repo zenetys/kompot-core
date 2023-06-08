@@ -4,6 +4,7 @@ set -f
 export PATH="$PATH:${0%/*}"
 PROGNAME=${0##*/}
 DRY_RUN=
+OVERRIDE=
 
 INSTALL_FILE_DEFAULTS=( -m 0644 -o root -g root )
 INSTALL_DIR_DEFAULTS=( -m 0755 -o root -g root )
@@ -35,6 +36,7 @@ Setup kompot for the system
 
 Available options:
   -n, --dry-run     Dry-run mode, do not change anything.
+  -o, --override    Reinstall files even if they exist.
   -h, --help        Display this help."
     exit "$status"
 }
@@ -164,8 +166,8 @@ function install-file() {
         fi
     fi
 
-    if [[ ! -e $dst ]] || { file_is_flagged_kompot "$src" &&
-                          ! file_is_flagged_kompot "$dst"; }; then
+    if [[ ! -e $dst || -n $OVERRIDE ]] || { file_is_flagged_kompot "$src" &&
+                                          ! file_is_flagged_kompot "$dst"; }; then
         if [[ -e $dst ]]; then
             mv_dot_increment "$dst" || return 1
             REPLY=override
@@ -216,6 +218,7 @@ function enable-file() {
 while (( $# > 0 )); do
     case "$1" in
         -n|--dry-run) DRY_RUN=1 ;;
+        -o|--override) OVERRIDE=1 ;;
         -h|--help) exit_usage ;;
         --) shift; break ;;
         -*) exit_usage 1 ;;
