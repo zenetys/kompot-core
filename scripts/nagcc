@@ -163,7 +163,7 @@ CNAME=${ARGS[2]}
 
 [[ $HNAME ]] || { usage && exit 1 ; }
 
-CVARS["COMMANDFILE"]="${NAGIOS_EXTERNAL_COMMAND_FILE:-/var/lib/nagios4/rw/nagios.cmd}"
+CVARS["COMMANDFILE"]="${NAGIOS_EXTERNAL_COMMAND_FILE:-/var/spool/nagios/cmd/nagios.cmd}"
 resource_to_cvars ${RESOURCE}
 
 hostdef="$(extract_nagios_block ${OBJECTDB} "$HNAME")"
