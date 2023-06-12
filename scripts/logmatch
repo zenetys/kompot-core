@@ -19,41 +19,39 @@ function dump(id, entry,  i, out) {
   printf("%s\n", out) > "/dev/stderr";
 }
 
-function isdigit(s) {
-  if (DIGITS[s]) return 1;
-  return 0;
-}
 
-function rewrite(re, a, new, t, alias) {
+function rewrite(re, a, new, t, cap) {
   # arg re      : rewrite rule
   # arg a       : array of string to use (return of match())
   # local new   : new string
   # local t     : temporary index
-  # local alias : temporary alias
+  # local cap   : temporary capture
 
   new = "";
   while(length(re) > 1) {
     if (!(t = index(re, "\\"))) break;
     if (t > 1) new = new substr(re, 1, t-1);
-    s = substr(re, t+1, 1);
-    if (isdigit(s)) {
-      new = new a[strtonum(s)];
-      re = substr(re, t + 2);
-    }
-    else if (s == "[" && substr(re, t+3, 1) == "]") {
-      s = substr(re, t+2, 1);
-      if (length(ALIAS) > 0 && ALIAS[a[strtonum(s)]]) {
-        new = new ALIAS[a[strtonum(s)]];
+    if (match(substr(re, t+1), /^(([0-9]+)|\{([0-9]+)\}|\[([0-9]+)\])/, cap)) {
+      if (cap[3] != "") {
+        # \{xx} where x can be > 9
+        new = new a[strtonum(cap[3])];
+      }
+      else if (cap[4] != "") {
+        # \[xx] where x can be > 9, with alias resolution
+        new = new (length(ALIAS) > 0 && ALIAS[a[strtonum(cap[4])]] \
+          ? ALIAS[a[strtonum(cap[4])]] : a[strtonum(cap[4])])
       }
       else {
-        new = new a[strtonum(s)];
+        # \x where x is a single digit
+        new = new a[strtonum(cap[2])];
       }
-      re = substr(re, t + 4);
+      t = t + 1 + cap[0, "length"];
     }
     else {
-      new = new "\\" s;
-      re = substr(re, t + 2);
+      new = new "\\";
+      t = t + 1 + (substr(re, t+1, 1) == "\\" ? 1 : 0);
     }
+    re = substr(re, t);
   }
   new = new re;
   return new;
