@@ -87,7 +87,7 @@ function rpm_verify_file() {
 
 function explain() {
     [[ -n $DRY_RUN ]] && info "RUN: ${*@Q}" && return 0
-    local REPLY=
+    REPLY=
     "$@"; local ret=$?
     case "$ret" in
         0) info "RUN: ${*@Q} => OK${REPLY:+, $REPLY}" ;;
