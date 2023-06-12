@@ -1,4 +1,0 @@
-input(
-    type="imuxsock"
-    socket="/dev/log"
-)

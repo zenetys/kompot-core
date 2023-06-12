@@ -303,10 +303,6 @@ if is_docker; then
     explain persist-symlink /etc/nagios /etc/kompot/nagios
     explain persist-symlink /var/spool/nagios /var/lib/kompot/nagios
 
-    # rsyslog
-    explain persist-symlink /etc/rsyslog.conf /etc/kompot/rsyslog/rsyslog.conf
-    explain persist-symlink /etc/rsyslog.d /etc/kompot/rsyslog/rsyslog.d
-
     # snmp
     explain persist-symlink /etc/snmp /etc/kompot/snmp
 
@@ -390,11 +386,14 @@ explain install-file --allow-disable /opt/kompot/share/samples/nagzen/000_templa
 [[ $REPLY == skip ]] || explain install-file --allow-disable /opt/kompot/share/samples/nagzen/100_inventory.cfg /etc/kompot/nagzen/
 
 # rsyslog
-explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/10-listen-dev-log.conf.disabled /etc/rsyslog.d/
-explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/11-listen-udp.conf.disabled /etc/rsyslog.d/
-explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/12-listen-relp.conf.disabled /etc/rsyslog.d/
-explain install-file /opt/kompot/share/configs/rsyslog/18-omprog-check-pattern.conf /etc/rsyslog.d/
-explain install-file /opt/kompot/share/configs/rsyslog/19-archives.conf /etc/rsyslog.d/
+explain install-file /opt/kompot/share/configs/rsyslog/rsyslog.env /etc/kompot/rsyslog/
+explain install-file /opt/kompot/share/configs/rsyslog/kompot.conf /etc/kompot/rsyslog/
+explain install-file /opt/kompot/share/configs/rsyslog/kompot.rsyslogd.conf /etc/rsyslog.d/50-kompot.conf
+explain install-dir /etc/kompot/rsyslog/conf.d
+if ! is_docker; then
+    explain install-file /opt/kompot/share/configs/rsyslog/rsyslog.systemd /etc/systemd/system/rsyslog.service.d/kompot.conf
+    [[ $REPLY == skip ]] || explain systemctl daemon-reload
+fi
 
 # snmp
 explain install-file /opt/kompot/share/configs/snmp/snmpd.local.conf /etc/snmp/
@@ -437,9 +436,10 @@ if is_docker; then
 fi
 
 # rsyslog
+explain sed-file -re 's,^\s*module\(load="builtin:omfile" Template=,#\0,' /etc/rsyslog.conf
 if ! has_journald; then
-    explain enable-file /etc/rsyslog.d/10-listen-dev-log.conf
     explain sed-file -re 's/^(module\(load="imjournal") [^c]/\1 config.enabled="off"/' /etc/rsyslog.conf
+    explain sed-file -re 's,^#?\s*(KOMPOT_RSYSLOG_LISTEN_DEV_LOG).*,\1=on,' /etc/kompot/rsyslog/rsyslog.env
 fi
 [[ -d /var/lib/kompot/configs/logmatch/current ]] ||
     explain sh -c 'update-passive build && APPLY_NO_RESTART=1 update-passive apply'
