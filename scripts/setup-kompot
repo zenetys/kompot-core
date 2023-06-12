@@ -352,7 +352,7 @@ explain install-dir -o nagios -g nagios /var/spool/nagios/plugins-cache
 # nagzen
 explain install-dir /etc/kompot/nagzen
 explain install-file --allow-disable /opt/kompot/share/samples/nagzen/000_template.cfg /etc/kompot/nagzen/
-explain install-file --allow-disable /opt/kompot/share/samples/nagzen/100_inventory.cfg /etc/kompot/nagzen/
+[[ $REPLY == skip ]] || explain install-file --allow-disable /opt/kompot/share/samples/nagzen/100_inventory.cfg /etc/kompot/nagzen/
 
 # rsyslog
 explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/10-listen-dev-log.conf.disabled /etc/rsyslog.d/
