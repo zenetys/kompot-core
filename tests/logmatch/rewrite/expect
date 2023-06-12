@@ -1,0 +1,9 @@
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-001: no rewrite
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-002: char \ is a backslash
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-003: sequence \2 not interpreted
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-004: arg2=AA, arg3=BB, done
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-005: arg2=AA, arg3=BB, ..., arg14=MM
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-006: arg2=AA, arg3=BB, ..., arg14=MM, end-of-Test-006
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;3;Test-007: arg2=AA, resolve-alias(arg3)=realhostBB, ..., resolve-alias(arg14)=realhostMM
+[0] PROCESS_SERVICE_CHECK_RESULT;host;prog;2;Test-008: arg2=AA, arg3=BB, ..., arg14=MM
+[0] PROCESS_SERVICE_CHECK_RESULT;realhostMM;realsvc;2;Test-009: arg2=AA, resolve-alias(arg3)=realhostBB, ..., resolve-alias(arg14)=realhostMM
