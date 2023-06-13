@@ -104,6 +104,7 @@ function do_build() {
     debug -3 "Compiling '$file'"
 
     if [[ ${file} =~ .*\.xls$ ]]; then
+      echo "# $file"
       while read -r; do
         unset "${headers[@]}"; eval "$REPLY"; [[ $row ]] || continue
         if [[ $pattern && $service ]]; then
@@ -138,13 +139,27 @@ function do_build() {
           echo
         fi
       done < <(xls2bash "$file" --detect-headers --ignore-comments | iconv -f cp1252 -t utf8)
+    elif [[ $file == *.conf ]] && grep -qE ^PATTERN "$file"; then
+      echo "# $file"
+      cat "$file"
+      echo
     fi
   done > $cfgdir/logmatch.conf
 
-  sed 's/#.*//' < /etc/hosts | while read ipaddr hostname rest; do
-    [[ -z $ipaddr ]] && continue
-    echo "${hostname} $ipaddr ${hostname,,} ${hostname^^} ${rest}"
-  done > $cfgdir/aliases.conf
+  {
+    echo "# /etc/hosts"
+    sed 's/#.*//' < /etc/hosts | while read ipaddr hostname rest; do
+      [[ -z $ipaddr ]] && continue
+      echo "${hostname} $ipaddr ${hostname,,} ${hostname^^} ${rest}"
+    done
+    echo
+    for file in "$@"; do
+      [[ $file == *alias*.conf ]] || continue
+      echo "# $file"
+      cat "$file"
+      echo
+    done
+  } > $cfgdir/aliases.conf
 
   # validate link to new config
   ln -snf ${cfgdir##*/} ${CFGDIR}/new
