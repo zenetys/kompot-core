@@ -293,8 +293,7 @@ if is_docker; then
     explain persist-symlink /var/lib/influxdb /var/lib/kompot/influxdb
 
     # logrotate
-    explain persist-symlink /etc/logrotate.conf /etc/kompot/logrotate/logrotate.conf
-    explain persist-symlink /etc/logrotate.d /etc/kompot/logrotate/logrotate.d
+    explain persist-symlink /var/lib/logrotate /var/lib/kompot/logrotate
 
     # nagflux
     explain persist-symlink /etc/nagflux /etc/kompot/nagflux
@@ -359,8 +358,9 @@ explain install-file /etc/kompot/logmatch/logmatch.conf
 explain install-file /etc/kompot/logmatch/aliases.conf
 
 # logrotate
-explain install-file /opt/kompot/share/configs/logrotate/logmatch /etc/logrotate.d/
-explain install-file /opt/kompot/share/configs/logrotate/rsyslog-network /etc/logrotate.d/
+explain install-file /opt/kompot/share/configs/logrotate/kompot.logrotate.conf /etc/logrotate.d/00-kompot.conf
+explain install-file /opt/kompot/share/configs/logrotate/kompot.conf /etc/kompot/logrotate/
+explain install-dir /etc/kompot/logrotate/conf.d
 
 # menus
 explain install-dir /etc/kompot/menus
