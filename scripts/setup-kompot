@@ -473,6 +473,14 @@ migration_scripts=($({
     sort -t $'\t' -k 3V,3 -k 1n,1 |
     awk -F $'\t' '$2=="persist"{p=1;next} $2=="current"{exit} p==1{print $4}'))
 
+if [[ -n $migration_scripts ]]; then
+    echo
+    echo '######################################'
+    echo '## /!\ KOMPOT MIGRATION SCRIPTS /!\ ##'
+    echo '######################################'
+    echo
+fi
+
 migration_missing=()
 for i in "${migration_scripts[@]}"; do
     if [[ -n $migration_missing ]] || ! explain "$i"; then
