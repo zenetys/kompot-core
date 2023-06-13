@@ -328,9 +328,10 @@ fi
 # INSTALL FILES
 
 # apache
-explain install-file /opt/kompot/share/configs/apache/kompot.conf /etc/httpd/conf.d/
+explain install-file /opt/kompot/share/configs/apache/kompot.httpd.conf /etc/httpd/conf.d/50-kompot.conf
+explain install-file /opt/kompot/share/configs/apache/defines.conf /etc/kompot/httpd/
+explain install-file /opt/kompot/share/configs/apache/kompot.conf /etc/kompot/httpd/
 explain install-dir /etc/kompot/httpd/conf.d
-explain install-file /opt/kompot/share/samples/apache/defines.conf /etc/kompot/httpd/
 
 # bin
 explain install-dir /etc/kompot/bin
