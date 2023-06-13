@@ -211,6 +211,13 @@ function create-file() {
     return 0
 }
 
+# Usage: sed-file -re 's,x,y,' file
+function sed-file() {
+    # abstract persist symlinks
+    file=$(readlink -m "${*: -1}")
+    sed -i "${@:1:$#-1}" "$file"
+}
+
 function enable-file() {
     REPLY=
     [[ -f $1 ]] && { REPLY=skip; return 0; }
@@ -392,7 +399,7 @@ fi
 
 # apache
 if is_docker; then
-    explain sed -i -re 's,^#(Define KOMPOT_REDIRECT_SLASH) .*,\1 1,' /etc/kompot/httpd/defines.conf
+    explain sed-file -re 's,^#(Define KOMPOT_REDIRECT_SLASH) .*,\1 1,' /etc/kompot/httpd/defines.conf
 fi
 explain usermod -aG nagios apache
 
@@ -404,7 +411,7 @@ fi
 # rsyslog
 if ! has_journald; then
     explain enable-file /etc/rsyslog.d/10-listen-dev-log.conf
-    explain sed -i -re 's/^(module\(load="imjournal") [^c]/\1 config.enabled="off"/' /etc/rsyslog.conf
+    explain sed-file -re 's/^(module\(load="imjournal") [^c]/\1 config.enabled="off"/' /etc/rsyslog.conf
 fi
 [[ -d /var/lib/kompot/configs/logmatch/current ]] ||
     explain sh -c 'update-passive build && APPLY_NO_RESTART=1 update-passive apply'
@@ -415,7 +422,7 @@ fi
 
 # snmpd
 if is_docker || rpm_verify_file /etc/snmp/snmpd.conf; then
-    explain sed -i -re 's,^(\s*com2sec\s+notConfigUser\s+default\s+public\>),#\1,' /etc/snmp/snmpd.conf
+    explain sed-file -re 's,^(\s*com2sec\s+notConfigUser\s+default\s+public\>),#\1,' /etc/snmp/snmpd.conf
 fi
 
 # snmptrapd
