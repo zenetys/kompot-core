@@ -316,7 +316,6 @@ if is_docker; then
         explain persist-symlink "/etc/ssh/ssh_host_${i}_key" /etc/kompot/ssh/
         explain persist-symlink "/etc/ssh/ssh_host_${i}_key.pub" /etc/kompot/ssh/
     done
-    explain persist-symlink /root/.ssh/authorized_keys /etc/kompot/ssh/authorized_keys.root
 
     # restore /var/log dirs in case it is a volume
     while read -r u g m d; do
@@ -402,8 +401,8 @@ explain install-file /opt/kompot/share/configs/snmp/snmptrapd.local.conf /etc/sn
 
 # ssh
 if is_docker; then
-    explain install-dir -m 700 -o root -g root /root/.ssh
-    explain install-file -m 600 -o root -g root /etc/kompot/ssh/authorized_keys.root
+    explain install-file /opt/kompot/share/configs/ssh/kompot.sshd.conf /etc/ssh/sshd_config.d/60-kompot.conf
+    explain install-file -m 600 -g root -g root /etc/kompot/ssh/authorized_keys.root
 fi
 
 # sudo
