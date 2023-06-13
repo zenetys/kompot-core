@@ -40,6 +40,9 @@ Available options:
     exit "$status"
 }
 
+# FIXME: Start operation should probably ignore (not an error)
+# masked services.
+
 function do_start() {
     local retval=0
     for i in "${SERVICES[@]}"; do
