@@ -341,7 +341,6 @@ explain install-file -m 640 -g grafana /opt/kompot/share/configs/grafana/grafana
 explain install-file /opt/kompot/share/configs/influxdb/influxdb.conf /etc/influxdb/
 
 # logmatch
-explain install-dir /etc/kompot/logmatch
 explain install-file /etc/kompot/logmatch/logmatch.conf
 explain install-file /etc/kompot/logmatch/aliases.conf
 
