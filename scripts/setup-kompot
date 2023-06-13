@@ -225,6 +225,18 @@ function enable-file() {
     mv "$1"{.disabled,}
 }
 
+# Usage: systemctl-enable-if-disabled SERVICE...
+# Service(s) won't be enabled if masked.
+function systemctl-enable-if-disabled() {
+    local i is_enabled ret=0
+    for i in "$@"; do
+        is_enabled=$(systemctl is-enabled "$i")
+        [[ $is_enabled == enabled ]] && continue
+        systemctl enable "$i" || ret=1
+    done
+    return "$ret"
+}
+
 # done when sourced
 (return 0 2>/dev/null) && return 0
 
@@ -438,16 +450,8 @@ explain sh -c 'CHECK_QUIET=1 /opt/kompot/share/configs/grafana/check-init-grafan
 
 # enable services at boot time
 if ! is_docker; then
-    systemctl enable crond
-    systemctl enable grafana-server
-    systemctl enable httpd
-    systemctl enable influxdb
-    systemctl enable nagflux
-    systemctl enable nagios
-    systemctl enable rsyslog
-    systemctl enable snmpd
-    systemctl enable snmptrapd
-    systemctl enable sshd
+    explain systemctl-enable-if-disabled crond grafana-server httpd influxdb \
+        nagflux nagios rsyslog snmpd snmptrapd sshd
 fi
 
 # MIGRATION
