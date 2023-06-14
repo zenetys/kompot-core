@@ -237,6 +237,15 @@ function systemctl-enable-if-disabled() {
     return "$ret"
 }
 
+function is_version_greater() {
+    local vleft=$1; shift
+    local vright=$1; shift
+    [[ $vleft == $vright ]] && return 1
+    local vgreater=$(printf '%s\n%s\n' "$vleft" "$vright" |sort -V |tail -n 1)
+    [[ $vgreater == $vleft ]] && return 0
+    return 1
+}
+
 # done when sourced
 (return 0 2>/dev/null) && return 0
 
@@ -259,6 +268,14 @@ if (( $# > 0 )); then
         (PROGNAME=${i##*/} source "$i") || ret=$?
     done
     exit "$ret"
+fi
+
+if [[ -z $KOMPOT_VERSION ]]; then
+    fatal 'Cannot find installed version, abort!'
+fi
+if [[ -n $KOMPOT_PERSIST_VERSION ]] &&
+   is_version_greater "$KOMPOT_PERSIST_VERSION" "$KOMPOT_VERSION"; then
+    fatal 'Persistence version greater than installed version, abort!'
 fi
 
 # DOCKER PERSISTANCE
@@ -456,8 +473,7 @@ fi
 # MIGRATION
 
 info "Persistence version: ${KOMPOT_PERSIST_VERSION:-<none>}"
-info "Current version: ${KOMPOT_VERSION:-<error>}"
-[[ -n $KOMPOT_VERSION ]] || fatal 'Cannot find current version, abort migration check'
+info "Installed version: $KOMPOT_VERSION"
 
 function persist-version() {
     echo "$KOMPOT_VERSION" > "$KOMPOT_PERSIST_VERSION_FILE"
