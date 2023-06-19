@@ -466,6 +466,18 @@ function prepare_request() {
       # combine previous filters
       FILTER+=( "And: $LEVEL_AND" )
     fi
+
+    if (( TRACK && LEVEL_AND > 0 )); then
+      FILTER+=( 'Filter: custom_variables != _TRACK ' )
+      FILTER+=( 'Filter: custom_variables != _TRACK 0' )
+      FILTER+=( 'And: 2' )
+      FILTER+=( 'Filter: custom_variables != _AUTOTRACK ' )
+      FILTER+=( 'Filter: custom_variables != _AUTOTRACK 0' )
+      FILTER+=( 'And: 2' )
+      # OR tracked
+      FILTER+=( 'Or: 3' )
+    fi
+
     if (( LEVEL_AND > 0 )); then
       (( FILTER_AND++ ))
     fi
@@ -494,6 +506,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
   ORDER=${_GET_order//[^0-9a-zA-Z_-]}
   LIMIT=${_GET_limit//[^0-9]}
   SINCE=${_GET_since//[^0-9]}
+  TRACK=${_GET_track//[^0-9]}
 
   declare -f do_$ACTION > /dev/null ||
     fatal "undefine action '$ACTION'"
