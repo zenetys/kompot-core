@@ -250,7 +250,7 @@ function livestatus() {
    [[ $ORDER ]] || request+=( ${LIMIT:+"Limit: $LIMIT"} )
 
    [[ -n $FAKE ]] && cat "$FAKE-$table.tsv" && return
-   echo "${request[*]}" >> /tmp/${0##*/}.debug
+   (( $DEBUG )) && echo "${request[*]}" >> /tmp/${0##*/}.debug
    $_UNIXCAT $LIVESOCKET <<<"${request[*]}"
 }
 
