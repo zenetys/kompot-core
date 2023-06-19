@@ -4,6 +4,14 @@
 
 _UNIXCAT=${_UNIXCAT:-unixcat}
 LIVESOCKET=${LIVESOCKET:-/var/spool/nagios/cmd/live.sock}
+LAST_IS_CV=${LAST_IS_CV:-1}
+
+CV_COLUMNS=(
+  _TRACK
+  _AUTOTRACK
+  _WARNING
+  _CRITICAL
+)
 
 IFS=$'\n'
 TAB=$'\t'
@@ -68,7 +76,6 @@ COMMON_COLUMNS=(
     last_hard_state_change                # Time of the last hard state change (Unix timestamp)
     # last_notification                     # Time of the last notification (Unix timestamp)
     last_state                            # State before last state change
-    last_state_change                     # Time of the last state change - soft or hard (Unix timestamp)
     # latency                               # Time difference between scheduled check time and actual check time
     # long_plugin_output                    # Complete output from check plugin
     # low_flap_threshold                    # Low threshold of flap detection
@@ -98,6 +105,7 @@ COMMON_COLUMNS=(
     # tag_names                             # A list of the names of the tags
     # tag_values                            # A list of the values of the tags
     # tags                                  # A dictionary of the tags
+    custom_variables                      # A dictionary of the custom variables
   )
 
 COLUMNS_SVC=(
@@ -107,6 +115,7 @@ COLUMNS_SVC=(
     host_state                                 # The current state of the host (0: up, 1: down, 2: unreachable)
     state                                      # The current state of the service (0: ok, 1: warning, 2: critical, 3: unknown)
     state_type                                 # Type of the current state (0: soft, 1: hard)
+    last_state_change                     # Time of the last state change - soft or hard (Unix timestamp)
 
     # host_*                                     # all host values
     # cache_interval                             #
@@ -127,6 +136,7 @@ COLUMNS_HST=(
     host_state                            # The current state of the host (0: up, 1: down, 2: unreachable)
     state                                 # The current state of the host (0: up, 1: down, 2: unreachable)
     state_type                            # Type of the current state (0: soft, 1: hard)
+    last_state_change                     # Time of the last state change - soft or hard (Unix timestamp)
 
     # last_time_down                        # The last time the host was DOWN (Unix timestamp)
     # last_time_unreachable                 # The last time the host was UNREACHABLE (Unix timestamp)
@@ -201,19 +211,32 @@ function tsv2json() {
          next;
        }
        if (INDEX == 1) {
-         printf("%s \"%s\": {",((NR>2)?",\n":" "), key($1));
+         printf("%s \"%s\": {",((NR>2)?",\n":" "), key($2));
        }
        else if (INDEX == 2) {
-         printf("%s\"%s\": {",((NR>2)?",\n":" "), key($1)":"key($2));
+         printf("%s\"%s\": {",((NR>2)?",\n":" "), key($2)":"key($3));
        }
        else if (INDEX == 3) {
-         printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n":" "), key($1), key($2));
+         printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n":" "), key($2), key($3));
        }
        else {
          printf("%s {",((NR>2)?",\n":" "));
        }
        for (i=1;i<=length(headers);i++) {
-         if (match($i, "[0-9]+") && RSTART == 1 && RLENGTH == length($i)) {
+         if (headers[i] == "custom_variables") {
+           split($i, cva, "\x0B");
+           for (cvi in cva) {
+             # value is a number
+             if (match(cva[cvi], "([^=]+)=([0-9]+(\\.[0-9]*)?|\\.[0-9]*)", m) &&
+                 RSTART == 1 && RLENGTH == length(cva[cvi])) {
+               printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
+             }
+             else if (match(cva[cvi], "([^=]+)=(\".*\"|.*)", m)) {
+               printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], m[2]);
+             }
+           }
+         }
+         else if (match($i, "-?[0-9]+(\\.[0-9]+)?") && RSTART == 1 && RLENGTH == length($i)) {
            printf("%s  \"%s\": %s", ((i>1)?",\n":"\n"), headers[i], ($i));
          }
          else {
@@ -242,7 +265,7 @@ function livestatus() {
    local request=(
      "GET $table"
      "${headers[@]}"
-     "Separators: 10 9 17 18"
+     "Separators: 10 9 11 61"
      "ColumnHeaders: $columnheaders"
      ${OUTPUT_JSON:+OutputFormat: json}
    )
@@ -255,19 +278,90 @@ function livestatus() {
 }
 
 function order() {
+  # add priority column before order
+  COLUMNS_SVC=( priority "${COLUMNS_SVC[@]}" )
+  # add custom variables columns after others
+  COLUMNS_SVC+=( ${CV_COLUMNS[@]} )
+  # change cat command to apply limit
+  if [[ $LIMIT ]]; then
+    function cat() {
+      head -n $LIMIT
+    }
+  fi
   if [[ $ORDER ]]; then
+    local reverse=0
     local col
+    # il ORDER start with '-', reverse the order
+    [[ ${ORDER:0:1} == - ]] && reverse=1
     for ((col=0;col<${#COLUMNS_SVC[@]};col++)); do
-      [[ ${COLUMNS_SVC[col]} == $ORDER ]] && break
+      [[ ${COLUMNS_SVC[col]} == ${ORDER:$reverse} ]] && break
     done
     if [[ $col < ${#COLUMNS_SVC[@]} ]]; then
-      ( read ; echo "$REPLY" ; sort -sfid -k $((col+1)) )
+      if (( $reverse )); then
+        ( read ; echo "$REPLY" ; sort -sfid -r -k $((col+1)) ) | cat
+      else
+        ( read ; echo "$REPLY" ; sort -sfid -k $((col+1)) ) | cat
+      fi
     else
       cat
     fi
   else
     cat
   fi
+  unset -f cat
+}
+
+function set_priority() {
+  local IFS=","
+
+  # compute priority and add CustomVariable columns
+  awk -v LAST_IS_CV=${LAST_IS_CV} -v CV_COLUMNS_ENV="${CV_COLUMNS[*]}" '
+      BEGIN {
+        # $4: host_state
+        # $5: state
+        # $7: last_state_change
+        NOW = systime();
+        i = 1;
+        PRIORITY["host_state","state"] = "priority";
+        PRIORITY[0,0] = i++;
+        PRIORITY[0,1] = i++;
+        PRIORITY[0,3] = i++;
+        PRIORITY[0,2] = i++;
+        PRIORITY[2,0] = i++;
+        PRIORITY[2,1] = i++;
+        PRIORITY[2,3] = i++;
+        PRIORITY[2,2] = i++;
+        PRIORITY[1,0] = i++;
+        PRIORITY[1,1] = i++;
+        PRIORITY[1,3] = i++;
+        PRIORITY[1,2] = i++;
+        split(CV_COLUMNS_ENV, CV_COLUMNS, ",");
+        for (cvi in CV_COLUMNS) CV_ENABLED[CV_COLUMNS[cvi]] = cvi;
+        FS = "\t";
+        OFS = "\t";
+      }
+      {
+        if ($2 == "") $2 = "-";
+        if (LAST_IS_CV && NR > 1) {
+          delete cv;
+          split($NF, kva, "\x0B");
+          for (kvi in kva) {
+            key = substr(kva[kvi],1,index(kva[kvi],"=")-1);
+            val = substr(kva[kvi],length(key)+2);
+            if (CV_ENABLED[key]) cv[CV_ENABLED[key]] = val;
+            # printf("<%s> <%s> => %d\n", key, val, CV_ENABLED[key]) >> "/dev/stderr";
+          }
+          $NF = "...";
+        }
+        printf("%s%s%s", NR == 1 ? PRIORITY[$4,$5] : sprintf("%.6lf", PRIORITY[$4,$5] + ($7 / NOW)), FS, $0);
+        if (LAST_IS_CV) {
+          for (cvi in CV_COLUMNS) {
+            printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:cv[cvi]));
+          }
+        }
+        printf("\n");
+      }
+  '
 }
 
 function do_GET() {
@@ -296,13 +390,11 @@ function do_hosts() {
     "${FILTER[@]}"
   )
 
-  livestatus hosts "${opts[@]}" "$@" |
-    awk 'BEGIN{FS="\t";OFS="\t";}{if ($2 == "") $2 = "-";print $0;}'
+  livestatus hosts "${opts[@]}" "$@"
 }
 
 function do_combined() {
-  ( do_services "$@" ; COLUMNHEADERS=off do_hosts "$@" ) |
-    ( read ; echo "$REPLY" ; sort -sfid )
+  ( do_services "$@" ; COLUMNHEADERS=off do_hosts "$@" )
 }
 
 function prepare_request() {
@@ -317,12 +409,14 @@ function prepare_request() {
     local subqueries=( ${QUERY// /$IFS} )
     for subquery in "${subqueries[@]}"; do
       PRE_FILTER_HST+=( "Filter: host_name ~~ $subquery" )
+      PRE_FILTER_HST+=( "Filter: host_address ~~ $subquery" )
       PRE_FILTER_HST+=( "Filter: plugin_output ~~ $subquery" )
-      PRE_FILTER_HST+=( "Or: 2" )
+      PRE_FILTER_HST+=( "Or: 3" )
       PRE_FILTER_SVC+=( "Filter: host_name ~~ $subquery" )
+      PRE_FILTER_SVC+=( "Filter: host_address ~~ $subquery" )
       PRE_FILTER_SVC+=( "Filter: description ~~ $subquery" )
       PRE_FILTER_SVC+=( "Filter: plugin_output ~~ $subquery" )
-      PRE_FILTER_SVC+=( "Or: 3" )
+      PRE_FILTER_SVC+=( "Or: 4" )
     done
     if (( ${#subqueries[@]} > 1 )); then
       PRE_FILTER_HST+=( "And: ${#subqueries[@]}" )
@@ -406,7 +500,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
 
   prepare_request
 
-  do_$ACTION | order | tsv2json --indexed-by-2columns
+  do_$ACTION | set_priority | order | tsv2json --indexed-by-2columns
 
   exit 0
 fi
@@ -450,11 +544,11 @@ declare -f do_$ACTION > /dev/null ||
 prepare_request
 
 if (( TSV )); then
-  do_$ACTION "${ARGS[@]}" | order
+  do_$ACTION "${ARGS[@]}" | set_priority | order
 elif (( JSON )); then
-  do_$ACTION "${ARGS[@]}" | order | tsv2json --indexed-by-2columns
+  do_$ACTION "${ARGS[@]}" | set_priority | order | tsv2json --indexed-by-2columns
 else
-  do_$ACTION "${ARGS[@]}" | order | column -t -s $TAB
+  do_$ACTION "${ARGS[@]}" | set_priority | order | column -t -s $TAB
 fi
 
 exit 0
