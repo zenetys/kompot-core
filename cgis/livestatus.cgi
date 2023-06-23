@@ -362,9 +362,10 @@ function prepare_request() {
       (( LEVEL_AND++ ))
     fi
     if [[ $LEVEL < 3 ]]; then
-      # only non-ACK
+      # only non-known issues
       FILTER+=( "Filter: acknowledged = 0" )
-      (( LEVEL_AND++ ))
+      FILTER+=( "Filter: notifications_enabled = 1" )
+      (( LEVEL_AND+=2 ))
     fi
 
     if (( LEVEL_AND > 1 )); then
