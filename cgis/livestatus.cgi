@@ -249,7 +249,7 @@ function livestatus() {
    # do not add limit with external order-by request
    [[ $ORDER ]] || request+=( ${LIMIT:+"Limit: $LIMIT"} )
 
-   [[ ! -x $_UNIXCAT ]] && cat $table.tsv && return
+   [[ -n $FAKE ]] && cat "$FAKE-$table.tsv" && return
    echo "${request[*]}" >> /tmp/${0##*/}.debug
    $_UNIXCAT $LIVESOCKET <<<"${request[*]}"
 }
@@ -423,6 +423,8 @@ while (( $# > 0 )); do
     -v|--verbose) ((VERBOSE++)) ;;
     ## -q, --quiet: Set verbose level to 0
     -q|--quiet) ((VERBOSE=0)) ;;
+    ## -F, --fake: Do not query livestatus, use <fake>-<table>.tsv
+    -F|--fake) FAKE=$2; shift ;;
     ## --tsv: Output as TSV
     --tsv) ((TSV=1)) ;;
     ## --json: Output as JSON
