@@ -363,7 +363,7 @@ function prepare_request() {
     fi
     if [[ $LEVEL < 3 ]]; then
       # only non-ACK
-      FILTER+=( "Filter: acknowledged = 1" )
+      FILTER+=( "Filter: acknowledged = 0" )
       (( LEVEL_AND++ ))
     fi
 
