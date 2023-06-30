@@ -153,5 +153,7 @@ fi
 
 [[ ${HTTP_X_DEBUG} -ge 1 ]] && show_debug_info 2>/dev/null
 
-source $SCRIPT
+if [[ ${SCRIPT} ]]; then
+    source "${SCRIPT}"
+fi
 

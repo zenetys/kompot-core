@@ -495,7 +495,7 @@ function prepare_request() {
 }
 
 if [[ $GATEWAY_INTERFACE ]]; then
-  source ./lib.cgi $0
+  source ./lib.cgi
 
   header "Status: 200"
   header "Content-type: application/json"
