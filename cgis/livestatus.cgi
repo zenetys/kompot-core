@@ -56,7 +56,6 @@ COMMON_COLUMNS=(
     # flap_detection_enabled                # Whether flap detection is enabled (0/1)
     groups                                # A list of all host groups this host is in
     hard_state                            # The effective hard state of the host (eliminates a problem in hard_state)
-    has_been_checked                      # Whether the host has already been checked (0/1)
     # high_flap_threshold                   # High threshold of flap detection
     icon_image                            # The name of an image file to be used in the web pages
     # icon_image_alt                        # Alternative text for the icon_image
@@ -94,7 +93,6 @@ COMMON_COLUMNS=(
     # notes_url_expanded                    # Same es notes_url, but with the most important macros expanded
     # notification_interval                 # Interval of periodic notification or 0 if its off
     # notification_period                   # Time period in which problems of this host will be notified. If empty then notification will be always
-    notifications_enabled                 # Whether notifications of the host are enabled (0/1)
     # percent_state_change                  # Percent state change
     # perf_data                             # Optional performance data of the last host check
     plugin_output                         # Output of the last host check
@@ -118,6 +116,8 @@ COLUMNS_SVC=(
     state                                      # The current state of the service (0: ok, 1: warning, 2: critical, 3: unknown)
     state_type                                 # Type of the current state (0: soft, 1: hard)
     last_state_change                     # Time of the last state change - soft or hard (Unix timestamp)
+    notifications_enabled                 # Whether notifications of the host are enabled (0/1)
+    has_been_checked                      # Whether the host has already been checked (0/1)
 
     # host_*                                     # all host values
     # cache_interval                             #
@@ -139,6 +139,8 @@ COLUMNS_HST=(
     state                                 # The current state of the host (0: up, 1: down, 2: unreachable)
     state_type                            # Type of the current state (0: soft, 1: hard)
     last_state_change                     # Time of the last state change - soft or hard (Unix timestamp)
+    notifications_enabled                 # Whether notifications of the host are enabled (0/1)
+    has_been_checked                      # Whether the host has already been checked (0/1)
 
     # last_time_down                        # The last time the host was DOWN (Unix timestamp)
     # last_time_unreachable                 # The last time the host was UNREACHABLE (Unix timestamp)
@@ -321,30 +323,54 @@ function set_priority() {
   # compute priority and add CustomVariable columns
   awk -v LAST_IS_CV=${LAST_IS_CV} -v CV_COLUMNS_ENV="${CV_COLUMNS[*]}" '
       BEGIN {
-        # $4: host_state
-        # $5: state
-        # $7: last_state_change
         NOW = systime();
-        i = 1;
-        PRIORITY["host_state","state"] = "priority";
-        PRIORITY[0,0] = i++;
-        PRIORITY[0,1] = i++;
-        PRIORITY[0,3] = i++;
-        PRIORITY[0,2] = i++;
-        PRIORITY[2,0] = i++;
-        PRIORITY[2,1] = i++;
-        PRIORITY[2,3] = i++;
-        PRIORITY[2,2] = i++;
-        PRIORITY[1,0] = i++;
-        PRIORITY[1,1] = i++;
-        PRIORITY[1,3] = i++;
-        PRIORITY[1,2] = i++;
         split(CV_COLUMNS_ENV, CV_COLUMNS, ",");
         for (cvi in CV_COLUMNS) CV_ENABLED[CV_COLUMNS[cvi]] = cvi;
         FS = "\t";
         OFS = "\t";
       }
+      function compute_priority() {
+        # $2: description, empty on hosts
+        # $4: host_state
+        # $5: state, same as host_state on hosts
+        # $7: last_state_change
+        # $8: notifications_enabled
+        # $9: has_been_checked
+
+        # printf("%s/%s, host_state=%s, state=%s, last_state_change=%s, notifications_enabled=%s, \
+        #   has_been_checked=%s\n", $1, $2, $4, $5, $7, $8, $9) >> "/dev/stderr";
+
+        if ($8 == 0) # notification disabled
+          return 0;
+        if ($2 == "") { # host
+          if ($9 == 0) # host pending
+            return 2;
+          if ($4 == 0) # host up
+            return 4;
+          if ($4 == 2) # host unreachable
+            return 7;
+          if ($4 == 1) # host down
+            return 9;
+        }
+        else if ($9 == 0) # service pending
+          return 1;
+        else if ($5 == 0) # service ok
+          return 4;
+        else if ($5 == 1) # service warning
+          return 5;
+        else if ($5 == 3) # service unknown
+          return 6;
+        else if ($5 == 2) # service critical
+          return 8;
+        # default
+        return -1;
+      }
       {
+        if (NR == 1)
+          priority = "priority";
+        else {
+          priority = sprintf("%.9lf", compute_priority() + ($7 / NOW));
+        }
         if ($2 == "") $2 = "-";
         if (LAST_IS_CV && NR > 1) {
           delete cv;
@@ -357,7 +383,7 @@ function set_priority() {
           }
           $NF = "...";
         }
-        printf("%s%s%s", NR == 1 ? PRIORITY[$4,$5] : sprintf("%.6lf", PRIORITY[$4,$5] + ($7 / NOW)), FS, $0);
+        printf("%s%s%s", priority, FS, $0);
         if (LAST_IS_CV) {
           for (cvi in CV_COLUMNS) {
             printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:cv[cvi]));
