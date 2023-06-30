@@ -532,7 +532,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
   header --send
   ACTION=${_GET_action//[^0-9a-zA-Z\-]}
   LEVEL=${_GET_level//[^0-9]}
-  QUERY=${_GET_query//[^0-9a-zA-Z_ +-]}
+  QUERY=${_GET_query//[^0-9a-zA-Z_. +-]}
   ORDER=${_GET_order//[^0-9a-zA-Z_-]}
   LIMIT=${_GET_limit//[^0-9]}
   SINCE=${_GET_since//[^0-9]}
