@@ -459,25 +459,22 @@ function prepare_request() {
     LEVEL_AND=0
     if [[ $LEVEL == 0 ]]; then
       # only CRITICAL
-      FILTER+=( "Filter: host_state = 0" )
-      FILTER+=( "Filter: state = 2" )
-      FILTER+=( "And: 2" )
-      FILTER+=( "Filter: host_state = 1" )
-      FILTER+=( "Or: 2" )
+      PRE_FILTER_SVC+=( "Filter: host_state = 0" )
+      PRE_FILTER_SVC+=( "Filter: state = 2" )
+      PRE_FILTER_SVC+=( "And: 2" )
+      PRE_FILTER_HST+=( "Filter: state = 1" )
       (( LEVEL_AND++ ))
     elif [[ $LEVEL < 4 ]]; then
       # only non-OK
-      FILTER+=( "Filter: host_state = 0" )
-      FILTER+=( "Filter: state != 0" )
-      FILTER+=( "And: 2" )
-      FILTER+=( "Filter: host_state = 1" )
-      FILTER+=( "Or: 2" )
+      PRE_FILTER_SVC+=( "Filter: host_state = 0" )
+      PRE_FILTER_SVC+=( "Filter: state != 0" )
+      PRE_FILTER_SVC+=( "And: 2" )
+      PRE_FILTER_HST+=( "Filter: state = 1" )
       (( LEVEL_AND++ ))
     elif [[ $LEVEL < 5 ]]; then
       # regard-less of OUTAGE
-      FILTER+=( "Filter: state != 0" )
-      FILTER+=( "Filter: host_state != 0" )
-      FILTER+=( "Or: 2" )
+      PRE_FILTER_SVC+=( "Filter: state != 0" )
+      PRE_FILTER_HST+=( "Filter: state != 0" )
       (( LEVEL_AND++ ))
     fi
     if [[ $LEVEL < 2 ]]; then
