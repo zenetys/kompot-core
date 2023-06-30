@@ -281,7 +281,7 @@ function livestatus() {
 
 function order() {
   # add priority column before order
-  COLUMNS_SVC=( priority "${COLUMNS_SVC[@]}" )
+  COLUMNS_SVC=( priority:float "${COLUMNS_SVC[@]}" )
   # add custom variables columns after others
   COLUMNS_SVC+=( ${CV_COLUMNS[@]} )
   # change cat command to apply limit
@@ -291,19 +291,21 @@ function order() {
     }
   fi
   if [[ $ORDER ]]; then
-    local reverse=0
+    local sortopts=()
     local col
-    # il ORDER start with '-', reverse the order
-    [[ ${ORDER:0:1} == - ]] && reverse=1
+    # if ORDER start with '-', reverse the order
+    [[ ${ORDER:0:1} == - ]] && sortopts+=( -r )
     for ((col=0;col<${#COLUMNS_SVC[@]};col++)); do
-      [[ ${COLUMNS_SVC[col]} == ${ORDER:$reverse} ]] && break
+      [[ ${COLUMNS_SVC[col]%%:*} == ${ORDER#-} ]] && break
     done
     if [[ $col < ${#COLUMNS_SVC[@]} ]]; then
-      if (( $reverse )); then
-        ( read ; echo "$REPLY" ; sort -sfid -r -k $((col+1)) ) | cat
+      local type=${COLUMNS_SVC[col]#*:}
+      if [[ $type == float || $type == int ]]; then
+        sortopts+=( -n )
       else
-        ( read ; echo "$REPLY" ; sort -sfid -k $((col+1)) ) | cat
+        sortopts+=( -sfid )
       fi
+      ( read ; echo "$REPLY" ; sort "${sortopts[@]}" -k $((col+1)) ) | cat
     else
       cat
     fi
