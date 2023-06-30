@@ -480,7 +480,7 @@ function prepare_request() {
       FILTER+=( "Or: 2" )
       (( LEVEL_AND++ ))
     fi
-    if [[ $LEVEL < 2 && $LEVEL < 5 ]]; then
+    if [[ $LEVEL < 2 ]]; then
       # only HARD-STATE
       FILTER+=( "Filter: state_type = 1" )
       (( LEVEL_AND++ ))
