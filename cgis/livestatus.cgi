@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export LC_ALL=C
+
 (( ${#BASH_SOURCE[@]} > 1 )) && return
 
 _UNIXCAT=${_UNIXCAT:-unixcat}
