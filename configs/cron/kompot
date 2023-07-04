@@ -1,4 +1,8 @@
 SHELL=/bin/bash
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/opt/kompot/bin:/etc/kompot/bin
 
+0 3 * * * root /opt/kompot/lib/logrotate/logrotate-mk-olddir
+
+2 4 * * * root platform=$(zservice platform); if [[ $? == 0 && $platform != systemd ]]; then logrotate /etc/logrotate.conf; ret=$?; [[ $ret == 0 ]] || logger -t logrotate "ALERT exited abnormally with [$ret]"; fi
+
 30 4 * * * nagios if [[ -d /var/log/nagios/archives/ ]]; then find /var/log/nagios/archives/ -mindepth 1 -maxdepth 1 -type f -name '*.log' -mtime +10 -delete; find /var/log/nagios/archives/ -mindepth 1 -maxdepth 1 -type f -name '*.log' -exec nice -n 19 xz -9 {} \; ; fi
