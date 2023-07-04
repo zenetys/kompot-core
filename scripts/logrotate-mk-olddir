@@ -1,0 +1,10 @@
+#!/bin/bash
+export LC_ALL=C
+logrotate -d /etc/logrotate.conf 2>&1 |
+    awk 'match($0, /olddir path (.+): No such file or directory/, cap) { print cap[1]; }' |
+    sort -u |
+    while read -r; do
+        mkdir -p -m 0700 "$REPLY" &&
+        chown --reference "$REPLY/.." "$REPLY" &&
+        chmod --reference "$REPLY/.." "$REPLY"
+    done
