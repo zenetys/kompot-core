@@ -445,6 +445,12 @@ fi
 [[ -d /var/lib/kompot/configs/logmatch/current ]] ||
     explain sh -c 'update-passive build && APPLY_NO_RESTART=1 update-passive apply'
 
+# logrotate
+if is_docker; then
+    explain sed-file -re 's!systemctl kill -s ([^ ]+) rsyslog.service!killall -\1 rsyslogd!' /etc/logrotate.d/syslog
+    explain sed-file -re 's![^ ]+/systemctl reload httpd.service!/usr/sbin/httpd -k graceful!' /etc/logrotate.d/httpd
+fi
+
 # nagios
 [[ -d /var/lib/kompot/configs/nagios/current ]] ||
     explain sh -c 'update-nagios build /etc/kompot/nagzen/* && APPLY_NO_RESTART=1 update-nagios apply'
