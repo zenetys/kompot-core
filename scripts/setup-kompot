@@ -377,6 +377,7 @@ explain install-dir /etc/kompot/nagios/credentials
 explain install-dir /etc/kompot/nagios/objects
 explain install-file --allow-disable /opt/kompot/share/samples/nagios/credentials-default.cfg /etc/kompot/nagios/credentials/default.cfg
 explain install-dir /etc/kompot/plugins
+explain install-dir -o nagios -g nagios /var/log/nagios/archives
 explain install-dir -o nagios -g nagios /var/spool/nagios/nagfluxperfdata
 explain install-dir -o nagios -g nagios /var/spool/nagios/plugins-cache
 
