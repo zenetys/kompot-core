@@ -281,6 +281,9 @@ fi
 # DOCKER PERSISTANCE
 
 if is_docker; then
+    # centreon
+    explain persist-symlink /etc/centreon /etc/kompot/centreon
+
     # cron
     explain persist-symlink /etc/cron.d/kompot.local /etc/kompot/cron/kompot.local
 
@@ -473,7 +476,7 @@ explain sh -c 'CHECK_QUIET=1 /opt/kompot/share/configs/grafana/check-init-grafan
 
 # enable services at boot time
 if ! is_docker; then
-    explain systemctl-enable-if-disabled crond grafana-server httpd influxdb \
+    explain systemctl-enable-if-disabled centreon_vmware crond grafana-server httpd influxdb \
         nagflux nagios rsyslog snmpd snmptrapd sshd
 fi
 
