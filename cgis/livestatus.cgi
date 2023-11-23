@@ -6,7 +6,7 @@ export LC_ALL=C
 
 _UNIXCAT=${_UNIXCAT:-unixcat}
 LIVESOCKET=${LIVESOCKET:-/var/spool/nagios/cmd/live.sock}
-LAST_IS_CV=${LAST_IS_CV:-1}
+ENABLE_CV_COLUMNS=${ENABLE_CV_COLUMNS:-1}
 
 CV_COLUMNS=(
   _TRACK
@@ -319,7 +319,9 @@ function computed_columns() {
   local IFS=","
 
   # compute priority and add CustomVariable columns
-  awk -v LAST_IS_CV=${LAST_IS_CV} -v CV_COLUMNS_ENV="${CV_COLUMNS[*]}" '
+  awk -v "ENABLE_CV_COLUMNS=$ENABLE_CV_COLUMNS" \
+      -v "CV_COLUMNS_ENV=${CV_COLUMNS[*]}" \
+  '
       BEGIN {
         NOW = systime();
         split(CV_COLUMNS_ENV, CV_COLUMNS, ",");
@@ -370,7 +372,7 @@ function computed_columns() {
           priority = sprintf("%.9lf", compute_priority() + ($7 / NOW));
         }
         if ($2 == "") $2 = "-";
-        if (LAST_IS_CV && NR > 1) {
+        if (ENABLE_CV_COLUMNS && NR > 1) {
           delete cv;
           split($NF, kva, "\x0B");
           for (kvi in kva) {
@@ -382,7 +384,7 @@ function computed_columns() {
           $NF = "...";
         }
         printf("%s%s%s", priority, FS, $0);
-        if (LAST_IS_CV) {
+        if (ENABLE_CV_COLUMNS) {
           for (cvi in CV_COLUMNS) {
             printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:cv[cvi]));
           }
