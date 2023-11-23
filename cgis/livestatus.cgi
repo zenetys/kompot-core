@@ -16,6 +16,13 @@ CV_COLUMNS=(
 IFS=$'\n'
 TAB=$'\t'
 
+# <property> <option>, with <option> an integer described as follows:
+# 1: string or number detection (default)
+# 4: key-value object, for custom_variables
+JSON_FORMAT=(
+  custom_variables 4
+)
+
 # https://docs.checkmk.com/latest/en/livestatus_references.html
 
 COMMON_COLUMNS=(
@@ -191,20 +198,49 @@ function fatal() {
 }
 
 function tsv2json() {
+  local IFS=,
   local index
   [[ $1 == --indexed-by-first-column ]] && index=1
   [[ $1 == --indexed-by-2columns ]] && index=2
   [[ $1 == --dual-indexed ]] && index=3
-  awk -v INDEX=$index '
+  awk -v "INDEX=$index" \
+      -v "JSON_FORMAT_ENV=${JSON_FORMAT[*]}" \
+  '
     BEGIN {
       FS="\t";
       RS="\n";
       OFS="";
+      for (i=1; i<=split(JSON_FORMAT_ENV, json_format, ","); i+=2)
+        JSON_FORMAT[json_format[i]] = json_format[i+1];
       delete headers;
       printf("%s\n", ( INDEX ? "{" : "[" ));
     }
     function key(v) {
       return tolower((gensub("[^A-Za-z0-9]", "_", "g", v)));
+    }
+    function json(value) {
+      if (match(value, "^-?[0-9]+(\\.[0-9]+)?$"))
+        return value;
+      return gensub("([\"\\\\])","\\\\\\1", "g", value);
+    }
+    function json_property(key, value, format            ,buf,i,a,p,jkv) {
+      if (format <= 1) {
+        return "\""key"\": " json(value);
+      }
+      if (format == 4) {
+        buf = "";
+        split(value, a, "\x0B");
+        for (i in a) {
+          p = index(a[i], "=");
+          if (p > 1) {
+            jkv = json_property(substr(a[i], 1, p-1), substr(a[i], p+1), 1);
+            if (jkv)
+              buf = buf (buf?", ":"{ ") jkv;
+          }
+        }
+        return (buf=="") ? "" : ("\""key"\": " buf " }");
+      }
+      return "";
     }
     {
       if (length(headers) == 0) {
@@ -224,26 +260,12 @@ function tsv2json() {
       else {
         printf("%s {",((NR>2)?",\n":" "));
       }
+      nprops = 0;
       for (i=1;i<=length(headers);i++) {
-        if (headers[i] == "custom_variables") {
-          split($i, cva, "\x0B");
-          for (cvi in cva) {
-            # value is a number
-            if (match(cva[cvi], "^([^=]+)=(-?[0-9]+(\\.[0-9]+)?)$", m)) {
-              printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
-            }
-            else if (match(cva[cvi], "^([^=]+)=(.*)", m)) {
-              value = gensub("([\"\\\\])","\\\\\\1", "g", (m[2]));
-              printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], value);
-            }
-          }
-        }
-        else if (match($i, "^-?[0-9]+(\\.[0-9]+)?$")) {
-          printf("%s  \"%s\": %s", ((i>1)?",\n":"\n"), headers[i], ($i));
-        }
-        else {
-          value = gensub("([\"\\\\])","\\\\\\1", "g", ($i));
-          printf("%s  \"%s\": \"%s\"", ((i>1)?",\n":"\n"), headers[i], value);
+        jkv = json_property(headers[i], $i, JSON_FORMAT[headers[i]]);
+        if (jkv) {
+          printf("%s  %s", ((nprops>0)?",\n":"\n"), jkv);
+          nprops++;
         }
       }
       if (INDEX == 3) {
