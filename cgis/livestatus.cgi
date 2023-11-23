@@ -213,13 +213,13 @@ function tsv2json() {
         next;
       }
       if (INDEX == 1) {
-        printf("%s \"%s\": {",((NR>2)?",\n":" "), key($2));
+        printf("%s \"%s\": {",((NR>2)?",\n ":" "), key($2));
       }
       else if (INDEX == 2) {
-        printf("%s\"%s\": {",((NR>2)?",\n":" "), key($2)":"key($3));
+        printf("%s\"%s\": {",((NR>2)?",\n ":" "), key($2)":"key($3));
       }
       else if (INDEX == 3) {
-        printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n":" "), key($2), key($3));
+        printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n ":" "), key($2), key($3));
       }
       else {
         printf("%s {",((NR>2)?",\n":" "));
