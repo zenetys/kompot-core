@@ -229,8 +229,7 @@ function tsv2json() {
           split($i, cva, "\x0B");
           for (cvi in cva) {
             # value is a number
-            if (match(cva[cvi], "([^=]+)=([0-9]+(\\.[0-9]*)?|\\.[0-9]*)", m) &&
-                RSTART == 1 && RLENGTH == length(cva[cvi])) {
+            if (match(cva[cvi], "^([^=]+)=(-?[0-9]+(\\.[0-9]+)?)$", m)) {
               printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
             }
             else if (match(cva[cvi], "([^=]+)=(\".*\"|.*)", m)) {
@@ -238,7 +237,7 @@ function tsv2json() {
             }
           }
         }
-        else if (match($i, "-?[0-9]+(\\.[0-9]+)?") && RSTART == 1 && RLENGTH == length($i)) {
+        else if (match($i, "^-?[0-9]+(\\.[0-9]+)?$")) {
           printf("%s  \"%s\": %s", ((i>1)?",\n":"\n"), headers[i], ($i));
         }
         else {
