@@ -232,8 +232,9 @@ function tsv2json() {
             if (match(cva[cvi], "^([^=]+)=(-?[0-9]+(\\.[0-9]+)?)$", m)) {
               printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
             }
-            else if (match(cva[cvi], "([^=]+)=(\".*\"|.*)", m)) {
-              printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], m[2]);
+            else if (match(cva[cvi], "^([^=]+)=(.*)", m)) {
+              value = gensub("([\"\\\\])","\\\\\\1", "g", (m[2]));
+              printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], value);
             }
           }
         }
