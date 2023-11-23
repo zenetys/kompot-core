@@ -315,7 +315,7 @@ function order() {
   unset -f cat
 }
 
-function set_priority() {
+function computed_columns() {
   local IFS=","
 
   # compute priority and add CustomVariable columns
@@ -538,7 +538,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
 
   prepare_request
 
-  do_$ACTION | set_priority | order | tsv2json --indexed-by-2columns
+  do_$ACTION | computed_columns | order | tsv2json --indexed-by-2columns
 
   exit 0
 fi
@@ -582,11 +582,11 @@ declare -f do_$ACTION > /dev/null ||
 prepare_request
 
 if (( TSV )); then
-  do_$ACTION "${ARGS[@]}" | set_priority | order
+  do_$ACTION "${ARGS[@]}" | computed_columns | order
 elif (( JSON )); then
-  do_$ACTION "${ARGS[@]}" | set_priority | order | tsv2json --indexed-by-2columns
+  do_$ACTION "${ARGS[@]}" | computed_columns | order | tsv2json --indexed-by-2columns
 else
-  do_$ACTION "${ARGS[@]}" | set_priority | order | column -t -s $TAB
+  do_$ACTION "${ARGS[@]}" | computed_columns | order | column -t -s $TAB
 fi
 
 exit 0
