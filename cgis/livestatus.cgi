@@ -19,8 +19,10 @@ LIVESEP=( 10 9 11 61 )
 
 # <property> <option>, with <option> an integer described as follows:
 # 1: string or number detection (default)
+# 3: array according to livestatus 3rd separator
 # 4: key-value object, for custom_variables
 JSON_FORMAT=(
+  groups 3
   custom_variables 4
 )
 
@@ -229,6 +231,12 @@ function tsv2json() {
     function json_property(key, value, format            ,buf,i,a,p,jkv) {
       if (format <= 1) {
         return "\""key"\": " json(value);
+      }
+      if (format == 3) {
+        buf = "\""key"\": [";
+        for (i=1; i<=split(value, a, ARRAYSEP); i++)
+          buf = buf (i>1?",":"") json(a[i]);
+        return buf "]";
       }
       if (format == 4) {
         buf = "";
