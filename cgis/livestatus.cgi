@@ -217,6 +217,8 @@ function tsv2json() {
       ARRAYSEP = sprintf("%c", ARRAYSEP);
       for (i=1; i<=split(JSON_FORMAT_ENV, json_format, ","); i+=2)
         JSON_FORMAT[json_format[i]] = json_format[i+1];
+      for (i=1; i<=127; i++)
+        JESC[sprintf("%c", i)] = sprintf("\\u%04x", i);
       delete headers;
       printf("%s\n", ( INDEX ? "{" : "[" ));
     }
@@ -226,7 +228,12 @@ function tsv2json() {
     function json(value) {
       if (match(value, "^-?[0-9]+(\\.[0-9]+)?$"))
         return value;
-      return gensub("([\"\\\\])","\\\\\\1", "g", value);
+      buf = "\"";
+      while (match(value, /[\x1-\x1f\\"\x7f]/)) {
+        buf = buf substr(value, 1, RSTART-1) JESC[substr(value, RSTART, RLENGTH)];
+        value = substr(value, RSTART+RLENGTH);
+      }
+      return buf value "\"";
     }
     function json_property(key, value, format            ,buf,i,a,p,jkv) {
       if (format <= 1) {
