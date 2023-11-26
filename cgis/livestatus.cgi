@@ -536,16 +536,30 @@ function prepare_request() {
 
   if [[ $QUERY ]]; then
     local subqueries=( ${QUERY// /$IFS} )
+    local subquery not
     for subquery in "${subqueries[@]}"; do
+      if [[ ${subquery:0:1} == '!' ]]; then
+        subquery=${subquery:1}
+        not=1
+      else
+        not=
+      fi
       PRE_FILTER_HST+=( "Filter: host_name ~~ $subquery" )
       PRE_FILTER_HST+=( "Filter: host_address ~~ $subquery" )
       PRE_FILTER_HST+=( "Filter: plugin_output ~~ $subquery" )
-      PRE_FILTER_HST+=( "Or: 3" )
+      PRE_FILTER_HST+=( "Filter: host_custom_variables ~~ _TAGS $subquery" )
+      PRE_FILTER_HST+=( "Or: 4" )
       PRE_FILTER_SVC+=( "Filter: host_name ~~ $subquery" )
       PRE_FILTER_SVC+=( "Filter: host_address ~~ $subquery" )
       PRE_FILTER_SVC+=( "Filter: description ~~ $subquery" )
       PRE_FILTER_SVC+=( "Filter: plugin_output ~~ $subquery" )
-      PRE_FILTER_SVC+=( "Or: 4" )
+      PRE_FILTER_SVC+=( "Filter: host_custom_variables ~~ _TAGS $subquery" )
+      PRE_FILTER_SVC+=( "Filter: custom_variables ~~ _TAGS $subquery" )
+      PRE_FILTER_SVC+=( "Or: 6" )
+      if [[ -n $not ]]; then
+        PRE_FILTER_HST+=( "Negate:" )
+        PRE_FILTER_SVC+=( "Negate:" )
+      fi
     done
     if (( ${#subqueries[@]} > 1 )); then
       PRE_FILTER_HST+=( "And: ${#subqueries[@]}" )
@@ -628,7 +642,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
   header --send
   ACTION=${_GET_action//[^0-9a-zA-Z\-]}
   LEVEL=${_GET_level//[^0-9]}
-  QUERY=${_GET_query//[^0-9a-zA-Z_. @:#+-]}
+  QUERY=${_GET_query//[^0-9a-zA-Z_. @:#!+-]}
   ORDER=${_GET_order//[^0-9a-zA-Z_-]}
   LIMIT=${_GET_limit//[^0-9]}
   SINCE=${_GET_since//[^0-9]}
