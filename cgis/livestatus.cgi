@@ -193,72 +193,72 @@ function fatal() {
 }
 
 function tsv2json() {
-   local index
-   [[ $1 == --indexed-by-first-column ]] && index=1
-   [[ $1 == --indexed-by-2columns ]] && index=2
-   [[ $1 == --dual-indexed ]] && index=3
-   awk -v INDEX=$index '
-     BEGIN {
-       FS="\t";
-       RS="\n";
-       OFS="";
-       delete headers;
-       printf("%s\n", ( INDEX ? "{" : "[" ));
-     }
-     function key(v) {
-       return tolower((gensub("[^A-Za-z0-9]", "_", "g", v)));
-     }
-     {
-       if (length(headers) == 0) {
-         for (i=1;i<=NF;i++)
-           headers[length(headers)+1] = ($i);
-         next;
-       }
-       if (INDEX == 1) {
-         printf("%s \"%s\": {",((NR>2)?",\n":" "), key($2));
-       }
-       else if (INDEX == 2) {
-         printf("%s\"%s\": {",((NR>2)?",\n":" "), key($2)":"key($3));
-       }
-       else if (INDEX == 3) {
-         printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n":" "), key($2), key($3));
-       }
-       else {
-         printf("%s {",((NR>2)?",\n":" "));
-       }
-       for (i=1;i<=length(headers);i++) {
-         if (headers[i] == "custom_variables") {
-           split($i, cva, "\x0B");
-           for (cvi in cva) {
-             # value is a number
-             if (match(cva[cvi], "([^=]+)=([0-9]+(\\.[0-9]*)?|\\.[0-9]*)", m) &&
-                 RSTART == 1 && RLENGTH == length(cva[cvi])) {
-               printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
-             }
-             else if (match(cva[cvi], "([^=]+)=(\".*\"|.*)", m)) {
-               printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], m[2]);
-             }
-           }
-         }
-         else if (match($i, "-?[0-9]+(\\.[0-9]+)?") && RSTART == 1 && RLENGTH == length($i)) {
-           printf("%s  \"%s\": %s", ((i>1)?",\n":"\n"), headers[i], ($i));
-         }
-         else {
-           value = gensub("([\"\\\\])","\\\\\\1", "g", ($i));
-           printf("%s  \"%s\": \"%s\"", ((i>1)?",\n":"\n"), headers[i], value);
-         }
-       }
-       if (INDEX == 3) {
-         printf("\n } }");
-       }
-       else {
-         printf("\n }");
-       }
-     }
-     END {
-       printf("\n%s\n", ( INDEX ? "}" : "]" ));
-     }
-   '
+  local index
+  [[ $1 == --indexed-by-first-column ]] && index=1
+  [[ $1 == --indexed-by-2columns ]] && index=2
+  [[ $1 == --dual-indexed ]] && index=3
+  awk -v INDEX=$index '
+    BEGIN {
+      FS="\t";
+      RS="\n";
+      OFS="";
+      delete headers;
+      printf("%s\n", ( INDEX ? "{" : "[" ));
+    }
+    function key(v) {
+      return tolower((gensub("[^A-Za-z0-9]", "_", "g", v)));
+    }
+    {
+      if (length(headers) == 0) {
+        for (i=1;i<=NF;i++)
+          headers[length(headers)+1] = ($i);
+        next;
+      }
+      if (INDEX == 1) {
+        printf("%s \"%s\": {",((NR>2)?",\n":" "), key($2));
+      }
+      else if (INDEX == 2) {
+        printf("%s\"%s\": {",((NR>2)?",\n":" "), key($2)":"key($3));
+      }
+      else if (INDEX == 3) {
+        printf("%s \"%s\": { \"%s\": {", ((NR>2)?",\n":" "), key($2), key($3));
+      }
+      else {
+        printf("%s {",((NR>2)?",\n":" "));
+      }
+      for (i=1;i<=length(headers);i++) {
+        if (headers[i] == "custom_variables") {
+          split($i, cva, "\x0B");
+          for (cvi in cva) {
+            # value is a number
+            if (match(cva[cvi], "([^=]+)=([0-9]+(\\.[0-9]*)?|\\.[0-9]*)", m) &&
+                RSTART == 1 && RLENGTH == length(cva[cvi])) {
+              printf("%s\n  \"%s\": %s", ((i>1)?",":""), m[1], m[2]);
+            }
+            else if (match(cva[cvi], "([^=]+)=(\".*\"|.*)", m)) {
+              printf("%s\n  \"%s\": \"%s\"", ((i>1)?",":""), m[1], m[2]);
+            }
+          }
+        }
+        else if (match($i, "-?[0-9]+(\\.[0-9]+)?") && RSTART == 1 && RLENGTH == length($i)) {
+          printf("%s  \"%s\": %s", ((i>1)?",\n":"\n"), headers[i], ($i));
+        }
+        else {
+          value = gensub("([\"\\\\])","\\\\\\1", "g", ($i));
+          printf("%s  \"%s\": \"%s\"", ((i>1)?",\n":"\n"), headers[i], value);
+        }
+      }
+      if (INDEX == 3) {
+        printf("\n } }");
+      }
+      else {
+        printf("\n }");
+      }
+    }
+    END {
+      printf("\n%s\n", ( INDEX ? "}" : "]" ));
+    }
+  '
 }
 
 function livestatus() {
