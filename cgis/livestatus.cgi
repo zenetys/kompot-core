@@ -28,9 +28,11 @@ LIVESEP=( 10 9 11 61 )
 
 # <property> <option>, with <option> an integer described as follows:
 # 1: string or number detection (default)
+# 2: skip on empty
 # 3: array according to livestatus 3rd separator
 # 4: key-value object, for custom_variables
 JSON_FORMAT=(
+  description 2
   groups 3
   host_custom_variables 4
   custom_variables 4
@@ -250,8 +252,10 @@ function tsv2json() {
       }
       return buf value "\"";
     }
-    function json_property(key, value, format            ,buf,i,a,p,jkv) {
-      if (format <= 1) {
+    function json_property(key, value, format            ,buf,i,a,n,p,jkv) {
+      if (format <= 2) {
+        if (format == 2 && value == "")
+          return "";
         return "\""key"\": " json(value);
       }
       if (format == 3) {
@@ -463,7 +467,6 @@ function computed_columns() {
         else {
           priority = sprintf("%.9lf", compute_priority() + ($7 / NOW));
         }
-        if ($2 == "") $2 = "-";
         if (ENABLE_CV_COLUMNS && NR > 1) {
           delete CVH; delete CVS;
           parse_cv(CV_FIELD[1], CVH); parse_cv(CV_FIELD[2], CVS);
@@ -472,7 +475,7 @@ function computed_columns() {
         printf("%s%s%s", priority, FS, $0);
         if (ENABLE_CV_COLUMNS) {
           for (cvi in CV_COLUMNS) {
-            printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:get_cv(CV_COLUMNS[cvi], ($2=="-"?0:1))));
+            printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:get_cv(CV_COLUMNS[cvi], ($2?1:0))));
           }
         }
         printf("\n");
