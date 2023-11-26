@@ -15,6 +15,7 @@ CV_COLUMNS=(
 
 IFS=$'\n'
 TAB=$'\t'
+LIVESEP=( 10 9 11 61 )
 
 # <property> <option>, with <option> an integer described as follows:
 # 1: string or number detection (default)
@@ -205,11 +206,13 @@ function tsv2json() {
   [[ $1 == --dual-indexed ]] && index=3
   awk -v "INDEX=$index" \
       -v "JSON_FORMAT_ENV=${JSON_FORMAT[*]}" \
+      -v "ARRAYSEP=${LIVESEP[2]}" \
   '
     BEGIN {
       FS="\t";
       RS="\n";
       OFS="";
+      ARRAYSEP = sprintf("%c", ARRAYSEP);
       for (i=1; i<=split(JSON_FORMAT_ENV, json_format, ","); i+=2)
         JSON_FORMAT[json_format[i]] = json_format[i+1];
       delete headers;
@@ -229,7 +232,7 @@ function tsv2json() {
       }
       if (format == 4) {
         buf = "";
-        split(value, a, "\x0B");
+        split(value, a, ARRAYSEP);
         for (i in a) {
           p = index(a[i], "=");
           if (p > 1) {
@@ -282,20 +285,20 @@ function tsv2json() {
 }
 
 function livestatus() {
-   local IFS=$'\n'
    local table=$1; shift
    local columnheaders=${COLUMNHEADERS:-on}
    local headers=( "$@" )
    local request=(
      "GET $table"
      "${headers[@]}"
-     "Separators: 10 9 11 61"
+     "Separators: ${LIVESEP[*]}"
      "ColumnHeaders: $columnheaders"
      ${OUTPUT_JSON:+OutputFormat: json}
    )
    # do not add limit with external order-by request
    [[ $ORDER ]] || request+=( ${LIMIT:+"Limit: $LIMIT"} )
 
+   local IFS=$'\n'
    [[ -n $FAKE ]] && cat "$FAKE-$table.tsv" && return
    (( $DEBUG )) && echo "${request[*]}" >> /tmp/${0##*/}.debug
    $_UNIXCAT $LIVESOCKET <<<"${request[*]}"
@@ -343,6 +346,7 @@ function computed_columns() {
   # compute priority and add CustomVariable columns
   awk -v "ENABLE_CV_COLUMNS=$ENABLE_CV_COLUMNS" \
       -v "CV_COLUMNS_ENV=${CV_COLUMNS[*]}" \
+      -v "ARRAYSEP=${LIVESEP[2]}" \
   '
       BEGIN {
         NOW = systime();
@@ -350,6 +354,7 @@ function computed_columns() {
         for (cvi in CV_COLUMNS) CV_ENABLED[CV_COLUMNS[cvi]] = cvi;
         FS = "\t";
         OFS = "\t";
+        ARRAYSEP = sprintf("%c", ARRAYSEP);
       }
       function compute_priority() {
         # $2: description, empty on hosts
@@ -396,7 +401,7 @@ function computed_columns() {
         if ($2 == "") $2 = "-";
         if (ENABLE_CV_COLUMNS && NR > 1) {
           delete cv;
-          split($NF, kva, "\x0B");
+          split($NF, kva, ARRAYSEP);
           for (kvi in kva) {
             key = substr(kva[kvi],1,index(kva[kvi],"=")-1);
             val = substr(kva[kvi],length(key)+2);
