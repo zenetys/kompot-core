@@ -10,10 +10,14 @@ ENABLE_CV_COLUMNS=${ENABLE_CV_COLUMNS:-1}
 
 # <name> <mode>, with <mode> an integer described as follows:
 # 1: value from the object, should it be an host or a service (default)
+# 2: host value
+# 3: service value
+# 4: value from the service if set, otherwise from the host
 # 5: merge both + unique as a list of words
 CV_COLUMNS=(
   _TRACK 1
   _AUTOTRACK 1
+  _PROCEDURE 4
   _TAGS 5
 )
 
@@ -441,6 +445,12 @@ function computed_columns() {
       function get_cv(key, type) {
         if (CV_MODE[key] <= 1)
           return (type == 0) ? CVH[key] : CVS[key];
+        if (CV_MODE[key] == 2)
+          return CVH[key];
+        if (CV_MODE[key] == 3)
+          return CVS[key];
+        if (CV_MODE[key] == 4)
+          return CVS[key] == "" ? CVH[key] : CVS[key];
         if (CV_MODE[key] == 5) {
           out = "";
           delete seen; delete cva;
