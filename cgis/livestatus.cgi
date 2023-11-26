@@ -8,9 +8,18 @@ _UNIXCAT=${_UNIXCAT:-unixcat}
 LIVESOCKET=${LIVESOCKET:-/var/spool/nagios/cmd/live.sock}
 ENABLE_CV_COLUMNS=${ENABLE_CV_COLUMNS:-1}
 
+# <name> <mode>, with <mode> an integer described as follows:
+# 1: value from the object, should it be an host or a service (default)
+# 5: merge both + unique as a list of words
 CV_COLUMNS=(
-  _TRACK
-  _AUTOTRACK
+  _TRACK 1
+  _AUTOTRACK 1
+  _TAGS 5
+)
+
+CV_FIELD=(
+  -2 # host custom variables
+  -1 # service custoom variables
 )
 
 IFS=$'\n'
@@ -23,7 +32,9 @@ LIVESEP=( 10 9 11 61 )
 # 4: key-value object, for custom_variables
 JSON_FORMAT=(
   groups 3
+  host_custom_variables 4
   custom_variables 4
+  _TAGS 3
 )
 
 # https://docs.checkmk.com/latest/en/livestatus_references.html
@@ -113,7 +124,6 @@ COMMON_COLUMNS=(
     # tag_names                             # A list of the names of the tags
     # tag_values                            # A list of the values of the tags
     # tags                                  # A dictionary of the tags
-    custom_variables                      # A dictionary of the custom variables
   )
 
 COLUMNS_SVC=(
@@ -137,6 +147,8 @@ COLUMNS_SVC=(
     # obsess_over_service                        # The current obsess_over_service setting... (0/1)
 
     "${COMMON_COLUMNS[@]}"
+    host_custom_variables                        # A dictionary of the custom variables (host)
+    custom_variables                             # A dictionary of the custom variables (service)
 )
 
 COLUMNS_HST=(
@@ -187,7 +199,10 @@ COLUMNS_HST=(
     # x_3d                                  # 3D-Coordinates: X
     # y_3d                                  # 3D-Coordinates: Y
     # z_3d                                  # 3D-Coordinates: Z
+
     "${COMMON_COLUMNS[@]}"
+    custom_variables                        # A dictionary of the custom variables (host)
+    dummy                                   # Align with service custom variables
 )
 
 function debug() {
@@ -361,12 +376,16 @@ function computed_columns() {
   # compute priority and add CustomVariable columns
   awk -v "ENABLE_CV_COLUMNS=$ENABLE_CV_COLUMNS" \
       -v "CV_COLUMNS_ENV=${CV_COLUMNS[*]}" \
+      -v "CV_FIELD_ENV=${CV_FIELD[*]}" \
       -v "ARRAYSEP=${LIVESEP[2]}" \
   '
       BEGIN {
         NOW = systime();
-        split(CV_COLUMNS_ENV, CV_COLUMNS, ",");
-        for (cvi in CV_COLUMNS) CV_ENABLED[CV_COLUMNS[cvi]] = cvi;
+        split(CV_FIELD_ENV, CV_FIELD, ",");
+        for (i=1; i<=split(CV_COLUMNS_ENV, cv_columns, ","); i+=2) {
+          CV_COLUMNS[int((i+1)/2)] = cv_columns[i];
+          CV_MODE[cv_columns[i]] = cv_columns[i+1];
+        }
         FS = "\t";
         OFS = "\t";
         ARRAYSEP = sprintf("%c", ARRAYSEP);
@@ -407,28 +426,53 @@ function computed_columns() {
         # default
         return -1;
       }
+      function parse_cv(field, out_ref) {
+        split($(field), kva, ARRAYSEP);
+        for (kvi in kva) {
+          key = substr(kva[kvi],1,index(kva[kvi],"=")-1);
+          if (CV_MODE[key])
+            out_ref[key] = substr(kva[kvi],length(key)+2);
+        }
+      }
+      function get_cv(key, type) {
+        if (CV_MODE[key] <= 1)
+          return (type == 0) ? CVH[key] : CVS[key];
+        if (CV_MODE[key] == 5) {
+          out = "";
+          delete seen; delete cva;
+          cva_len = split(CVH[key]","CVS[key], cva, /[[:blank:],]+/);
+          for (i = 1; i <= cva_len; i++) {
+            if (cva[i] != "" && !seen[cva[i]]) {
+              out = out (out==""?"":ARRAYSEP) (cva[i]);
+              seen[cva[i]] = 1;
+            }
+          }
+          return out;
+        }
+        return "";
+      }
       {
-        if (NR == 1)
+        if (NR == 1) {
           priority = "priority";
+          # CV fields: [1] hosts, [2] services
+          for (i in CV_FIELD) {
+            if (CV_FIELD[i] < 0)
+              CV_FIELD[i] = NF + 1 + CV_FIELD[i];
+          }
+        }
         else {
           priority = sprintf("%.9lf", compute_priority() + ($7 / NOW));
         }
         if ($2 == "") $2 = "-";
         if (ENABLE_CV_COLUMNS && NR > 1) {
-          delete cv;
-          split($NF, kva, ARRAYSEP);
-          for (kvi in kva) {
-            key = substr(kva[kvi],1,index(kva[kvi],"=")-1);
-            val = substr(kva[kvi],length(key)+2);
-            if (CV_ENABLED[key]) cv[CV_ENABLED[key]] = val;
-            # printf("<%s> <%s> => %d\n", key, val, CV_ENABLED[key]) >> "/dev/stderr";
-          }
-          $NF = "...";
+          delete CVH; delete CVS;
+          parse_cv(CV_FIELD[1], CVH); parse_cv(CV_FIELD[2], CVS);
+          $(CV_FIELD[1]) = "..."; $(CV_FIELD[2]) = "...";
         }
         printf("%s%s%s", priority, FS, $0);
         if (ENABLE_CV_COLUMNS) {
           for (cvi in CV_COLUMNS) {
-            printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:cv[cvi]));
+            printf("%s%s", FS, ((NR==1)?CV_COLUMNS[cvi]:get_cv(CV_COLUMNS[cvi], ($2=="-"?0:1))));
           }
         }
         printf("\n");
@@ -571,7 +615,7 @@ if [[ $GATEWAY_INTERFACE ]]; then
   header --send
   ACTION=${_GET_action//[^0-9a-zA-Z\-]}
   LEVEL=${_GET_level//[^0-9]}
-  QUERY=${_GET_query//[^0-9a-zA-Z_. +-]}
+  QUERY=${_GET_query//[^0-9a-zA-Z_. @:#+-]}
   ORDER=${_GET_order//[^0-9a-zA-Z_-]}
   LIMIT=${_GET_limit//[^0-9]}
   SINCE=${_GET_since//[^0-9]}
