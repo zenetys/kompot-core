@@ -122,7 +122,7 @@ function do_build() {
   [[ -z $title ]] && title=${HOSTNAME%%.*}
   title=$(echo "$title" |sed -zre 's,[[:cntrl:]]+, ,g; s,\s+$,,; s,^\s+,,')
   { echo "$CONFIG_HEADER" |sed "s/%TITLE%/$title/"
-    find "$USERDIR/" -mindepth 1 -maxdepth 1 -type f -name '*.json' |
+    find "$USERDIR/" -mindepth 1 -maxdepth 1 -type f -name '*.json' |sort -V |
         while read -r; do
       printf ",\n"
       cat "$REPLY"
