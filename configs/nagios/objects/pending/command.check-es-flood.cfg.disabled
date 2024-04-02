@@ -1,0 +1,10 @@
+define command {
+    command_name    check_es_flood
+    command_line    $USER4$/check_es_flood \
+        --index '$_SERVICE_INDEX$' \
+        --interval '$_SERVICE_INTERVAL$' \
+        --min-doc-count '$_SERVICE_MIN_DOC_COUNT$' \
+        --min-score '$_SERVICE_MIN_SCORE$' \
+        --filter '$_SERVICE_FILTER$' \
+        --field '$_SERVICE_FIELD$'
+}

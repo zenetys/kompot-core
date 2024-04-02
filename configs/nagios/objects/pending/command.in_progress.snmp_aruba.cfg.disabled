@@ -1,0 +1,312 @@
+## ARUBA AP / CTRL ##
+
+
+define command{
+        command_name check_snmp_aruba_ap_usage
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::instant::snmp::plugin \
+                 --mode=ap-usage \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--filter-name='$_SERVICEFILTERNAME$' \
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+                 #--warning-cpu='$_SERVICEWARNINGCPU$' \
+                 #--critical-cpu='$_SERVICECRITICALCPU$' \
+                 #--warning-clients='$_SERVICEWARNINGCLIENTS$' \
+                 #--critical-clients='$_SERVICECRITICALCLIENTS$' \
+                 #--warning-mem-usage='$_SERVICEWARNINGMEMUSAGE$' \
+                 #--critical-mem-usage='$_SERVICECRITICALMEMUSAGE$' \
+                 #--warning-mem-usage-free='$_SERVICEWARNINGMEMUSAGEFREE$' \
+                 #--critical-mem-usage-free='$_SERVICECRITICALMEMUSAGEFREE$' \
+                 #--warning-mem-usage-prct='$_SERVICEWARNINGMEMUSAGEPRCT$' \
+                 #--critical-mem-usage-prct='$_SERVICECRITICALMEMUSAGEPRCT$' \
+
+define command{
+        command_name check_snmp_aruba_ssid_status
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::instant::snmp::plugin \
+                 --mode=ssid-status \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--filter-name='$_SERVICEFILTERNAME$' \
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+
+define command{
+        command_name check_snmp_aruba_ap_discovery
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=discovery \
+                 --hostname=$_ARUBACONTROLLERHOSTNAME$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $EXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_aruba_ssid_statistics
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=ap-ssid-statistics \
+                 --hostname=$_HOSTARUBACONTROLLERHOSTNAME$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--filter-ap='$_HOSTAPNAME$' \
+                 #--warning-bssid-stations-associated='$_SERVICEWARNINGBSSIDSTATIONSASSOCIATED$' \
+                 #--critical-bssid-stations-associated='$_SERVICECRITICALBSSIDSTATIONSASSOCIATED$' \
+                 #--warning-channel-noise='$_SERVICEWARNINGCHANNELNOISE$' \
+                 #--critical-channel-noise='$_SERVICECRITICALCHANNELNOISE$' \
+                 #--warning-signal-noise-ratio='$_SERVICEWARNINGSIGNALNOISERATIO$' \
+                 #--critical-signal-noise-ratio='$_SERVICECRITICALSIGNALNOISERATIO$' \
+                 #--warning-essid-stations-associated='$_SERVICEWARNINGESSIDSTATIONSASSOCIATED$' \
+                 #--critical-essid-stations-associated='$_SERVICECRITICALESSIDSTATIONSASSOCIATED$' \
+
+define command{
+        command_name check_snmp_aruba_ap_status
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=ap-status \
+                 --hostname=$_HOSTARUBACONTROLLERHOSTNAME$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--filter-name='$_HOSTAPNAME$' \
+                 #--warning-connected-current='$_SERVICEWARNINGCONNECTEDCURRENT$' \
+                 #--critical-connected-current='$_SERVICECRITICALCONNECTEDCURRENT$' \
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+                 #--warning-uptime='$_SERVICEWARNINGUPTIME$' \
+                 #--critical-uptime='$_SERVICECRITICALUPTIME$' \
+                 #--warning-controller-bootstrap='$_SERVICEWARNINGCONTROLLERBOOTSTRAP$' \
+                 #--critical-controller-bootstrap='$_SERVICECRITICALCONTROLLERBOOTSTRAP$' \
+                 #--warning-reboot='$_SERVICEWARNINGREBOOT$' \
+                 #--critical-reboot='$_SERVICECRITICALREBOOT$' \
+
+define command{
+        command_name check_snmp_aruba_ctrl_status
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=controller-status \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--warning-connected-current='$_SERVICEWARNINGCONNECTEDCURRENT$' \
+                 #--critical-connected-current='$_SERVICECRITICALCONNECTEDCURRENT$' \
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+
+define command{
+        command_name check_snmp_aruba_cpu
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=cpu \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --warning-utilization='$_SERVICE_WARNING$' \
+                 --critical-utilization='$_SERVICE_CRITICAL$'  \
+        $SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_aruba_mem
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=memory \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --warning-usage='$_SERVICE_WARNING$' \
+                 --critical-usage='$_SERVICE_CRITICAL$' \
+        $SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_aruba_storage
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=storage \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --warning-usage='$_SERVICE_WARNING$' \
+                 --critical-usage='$_SERVICE_CRITICAL$'  \
+        $SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_aruba_hardware
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=hardware \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --component='.*' \
+        $SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_aruba_license
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=license \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+
+define command{
+        command_name check_snmp_aruba_packet_errors
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=interfaces \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --interface='$_SERVICEFILTER$' \
+                 --name \
+                 --add-status \
+                 --add-errors \
+                 --statefile-dir '$USER11$' \
+                 --statefile-suffix _snmp_storage_$HOSTNAME$_$SERVICEDESC$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+                 #--warning-in-discard='$_SERVICEWARNINGINDISCARD$' \
+                 #--critical-in-discard='$_SERVICECRITICALINDISCARD$' \
+                 #--warning-out-discard='$_SERVICEWARNINGOUTDISCARD$' \
+                 #--critical-out-discard='$_SERVICECRITICALOUTDISCARD$' \
+                 #--warning-in-error='$_SERVICEWARNINGINERROR$' \
+                 #--critical-in-error='$_SERVICECRITICALINERROR$' \
+                 #--warning-out-error='$_SERVICEWARNINGOUTERROR$' \
+                 #--critical-out-error='$_SERVICECRITICALOUTERROR$' \
+
+define command{
+        command_name check_snmp_aruba_traffic
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=network::aruba::standard::snmp::plugin \
+                 --mode=interfaces \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --interface='$_SERVICEFILTER$' \
+                 --name \
+                 --add-status \
+                 --add-traffic \
+                 --statefile-dir '$USER11$' \
+                 --statefile-suffix _snmp_storage_$HOSTNAME$_$SERVICEDESC$ \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--warning-in-traffic='$_SERVICEWARNINGIN$' \
+                 #--critical-in-traffic='$_SERVICECRITICALIN$' \
+                 #--warning-out-traffic='$_SERVICEWARNINGOUT$' \
+                 #--critical-out-traffic='$_SERVICECRITICALOUT$' \
+
+#define command{
+#        command_name check__Net-Aruba-Standard-SNMP-Interfaces-Discover
+#        command_line $USER2$/centreon_plugins.pl \
+#                 --plugin=network::aruba::standard::snmp::plugin \
+#                 --mode=list-interfaces \
+#                 --hostname=$HOSTADDRESS$ \
+#        $_HOST_CRED_SNMP_CENTREON$ \
+#                 --disco-show
+#}
+#
+#define command{
+#        command_name check__Net-Aruba-Standard-SNMP-Interfaces-Macro
+#        command_line $USER2$/centreon_plugins.pl \
+#                 --plugin=network::aruba::standard::snmp::plugin \
+#                 --mode=list-interfaces \
+#                 --hostname=127.0.0.1 \
+#                 --disco-format
+#}
+#
+#define command{
+#        command_name check__Net-Aruba-Standard-SNMP-Packet-Errors-Id
+#        command_line $USER2$/centreon_plugins.pl \
+#                 --plugin=network::aruba::standard::snmp::plugin \
+#                 --mode=interfaces \
+#                 --hostname=$HOSTADDRESS$ \
+#        $_HOST_CRED_SNMP_CENTREON$ \
+#                 --interface='$_SERVICEINTERFACEID$' \
+#                 --add-status \
+#                 --add-errors \
+#                 --warning-in-discard='$_SERVICEWARNINGINDISCARD$' \
+#                 --critical-in-discard='$_SERVICECRITICALINDISCARD$' \
+#                 --warning-out-discard='$_SERVICEWARNINGOUTDISCARD$' \
+#                 --critical-out-discard='$_SERVICECRITICALOUTDISCARD$' \
+#                 --warning-in-error='$_SERVICEWARNINGINERROR$' \
+#                 --critical-in-error='$_SERVICECRITICALINERROR$' \
+#                 --warning-out-error='$_SERVICEWARNINGOUTERROR$' \
+#                 --critical-out-error='$_SERVICECRITICALOUTERROR$' \
+#        $SERVICEEXTRAOPTIONS$
+#}
+#
+#define command{
+#        command_name check__Net-Aruba-Standard-SNMP-Traffic-Name
+#        command_line $USER2$/centreon_plugins.pl \
+#                 --plugin=network::aruba::standard::snmp::plugin \
+#                 --mode=interfaces \
+#                 --hostname=$HOSTADDRESS$ \
+#        $_HOST_CRED_SNMP_CENTREON$ \
+#                 --interface='^$_SERVICEINTERFACENAME$$$' \
+#                 --name \
+#                 --add-status \
+#                 --add-traffic \
+#                 --warning-in-traffic='$_SERVICEWARNINGIN$' \
+#                 --critical-in-traffic='$_SERVICECRITICALIN$' \
+#                 --warning-out-traffic='$_SERVICEWARNINGOUT$' \
+#                 --critical-out-traffic='$_SERVICECRITICALOUT$' \
+#        $SERVICEEXTRAOPTIONS$
+#}
+#
+#define command{
+#        command_name check__Net-Aruba-Standard-SNMP-Packet-Errors-Name
+#        command_line $USER2$/centreon_plugins.pl \
+#                 --plugin=network::aruba::standard::snmp::plugin \
+#                 --mode=interfaces \
+#                 --hostname=$HOSTADDRESS$ \
+#        $_HOST_CRED_SNMP_CENTREON$ \
+#                 --interface='^$_SERVICEINTERFACENAME$$$' \
+#                 --name \
+#                 --add-status \
+#                 --add-errors \
+#                 --warning-in-discard='$_SERVICEWARNINGINDISCARD$' \
+#                 --critical-in-discard='$_SERVICECRITICALINDISCARD$' \
+#                 --warning-out-discard='$_SERVICEWARNINGOUTDISCARD$' \
+#                 --critical-out-discard='$_SERVICECRITICALOUTDISCARD$' \
+#                 --warning-in-error='$_SERVICEWARNINGINERROR$' \
+#                 --critical-in-error='$_SERVICECRITICALINERROR$' \
+#                 --warning-out-error='$_SERVICEWARNINGOUTERROR$' \
+#                 --critical-out-error='$_SERVICECRITICALOUTERROR$' \
+#        $SERVICEEXTRAOPTIONS$
+#}
+

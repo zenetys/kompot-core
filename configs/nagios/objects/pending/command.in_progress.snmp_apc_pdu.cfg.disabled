@@ -1,0 +1,43 @@
+## APC PDU ##
+
+define command{
+        command_name check_snmp_apc_pdu_hardware
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::pdu::apc::snmp::plugin \
+                 --mode=hardware \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --component='.*' \
+                 --verbose \
+        $SERVICEEXTRAOPTIONS$
+}
+                 #--warning='$_SERVICEWARNING$' \
+                 #--critical='$_SERVICECRITICAL$' \
+
+define command{
+        command_name check_snmp_apc_pdu_load
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::pdu::apc::snmp::plugin \
+                 --mode=load \
+                 --hostname=$HOSTADDRESS$  \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --verbose \
+        $SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_apc_pdu_outlet
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::pdu::apc::snmp::plugin \
+                 --mode=outlet \
+                 --hostname=$HOSTADDRESS$  \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --verbose \
+        $SERVICEEXTRAOPTIONS$
+}

@@ -1,0 +1,137 @@
+## APC UPS ##
+
+define command{
+        command_name check_snmp_apc_self_test
+        command_line $USER4$/check_apc.pl \
+                  -H $HOSTADDRESS$ \
+                  -C $_HOST_CRED_SNMP_COMMUNITY$ \
+                  -l health \
+                  -u
+}
+        #$_HOST_CRED_SNMP_CENTREON$
+        #$_SERVICE_CRED_GENERIC_SHORT$
+
+define command {
+    command_name check_snmp_apc_ups_battery_status
+    command_line $USER2$/centreon_plugins.pl \
+        --plugin=hardware::ups::apc::snmp::plugin \
+        --mode=battery-status \
+        --hostname=$HOSTADDRESS$ \
+        --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+        --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        --verbose \
+        $_SERVICEEXTRAOPTIONS$
+
+        #--warning-status='$_SERVICEWARNINGSTATUS$' \
+        #--critical-status='$_SERVICECRITICALSTATUS$' \
+        #--unknown-status='$_SERVICEUNKNOWNSTATUS$' \
+        #--warning-load='$_SERVICEWARNINGLOAD$' \
+        #--critical-load='$_SERVICECRITICALLOAD$' \
+        #--warning-voltage='$_SERVICEWARNINGVOLTAGE$' \
+        #--critical-voltage='$_SERVICECRITICALVOLTAGE$' \
+        #--warning-current='$_SERVICEWARNINGCURRENT$' \
+        #--critical-current='$_SERVICECRITICALCURRENT$' \
+        #--warning-temperature='$_SERVICEWARNINGTEMPERATURE$' \
+        #--critical-temperature='$_SERVICECRITICALTEMPERATURE$' \
+        #--warning-time='$_SERVICEWARNINGTIME$' \
+        #--critical-time='$_SERVICECRITICALTIME$' \
+        #--replace-lasttime-format='$_SERVICEREPLACELASTTIMEFORMAT$' \  # WRONG Parameter ?
+}
+
+define command{
+        command_name check_snmp_apc_ups_intput_lines
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::ups::apc::snmp::plugin \
+                 --mode=input-lines \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --verbose \
+        $_SERVICEEXTRAOPTIONS$
+}
+                 #--warning-voltage='$_SERVICEWARNINGVOLTAGE$' \
+                 #--critical-voltage='$_SERVICECRITICALVOLTAGE$' \
+                 #--warning-frequence='$_SERVICEWARNINGFREQUENCE$' \
+                 #--critical-frequence='$_SERVICECRITICALFREQUENCE$' \
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+                 #--warning-line-frequence='$_SERVICEWARNINGLINEFREQUENCE$' \
+                 #--critical-line-frequence='$_SERVICECRITICALLINEFREQUENCE$' \
+                 #--warning-line-phase-voltage='$_SERVICEWARNINGLINEPHASEVOLTAGE$' \
+                 #--critical-line-phase-voltage='$_SERVICECRITICALLINEPHASEVOLTAGE$' \
+                 #--warning-line-phase-current='$_SERVICEWARNINGLINEPHASECURRENT$' \
+                 #--critical-line-phase-current='$_SERVICECRITICALLINEPHASECURRENT$' \
+                 #--warning-line-phase-power='$_SERVICEWARNINGLINEPHASEPOWER$' \
+                 #--critical-line-phase-power='$_SERVICECRITICALLINEPHASEPOWER$' \
+
+define command{
+        command_name check_snmp_apc_ups_output_lines
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::ups::apc::snmp::plugin \
+                 --mode=output-lines \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --verbose \
+        $_SERVICEEXTRAOPTIONS$
+}
+                 #--warning-status='$_SERVICEWARNINGSTATUS$' \
+                 #--critical-status='$_SERVICECRITICALSTATUS$' \
+                 #--unknown-status='$_SERVICEUNKNOWNSTATUS$' \
+                 #--warning-load='$_SERVICEWARNINGLOAD$' \
+                 #--critical-load='$_SERVICECRITICALLOAD$' \
+                 #--warning-voltage='$_SERVICEWARNINGVOLTAGE$' \
+                 #--critical-voltage='$_SERVICECRITICALVOLTAGE$' \
+                 #--warning-current='$_SERVICEWARNINGCURRENT$' \
+                 #--critical-current='$_SERVICECRITICALCURRENT$' \
+                 #--warning-frequence='$_SERVICEWARNINGFREQUENCE$' \
+                 #--critical-frequence='$_SERVICECRITICALFREQUENCE$' \
+
+define command{
+        command_name check_snmp_apc_ups_sensors
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::ups::apc::snmp::plugin \
+                 --mode=sensors \
+                 --hostname=$HOSTADDRESS$ \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --verbose \
+        $_SERVICEEXTRAOPTIONS$
+}
+
+define command{
+        command_name check_snmp_apc_ups_time
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::ups::apc::snmp::plugin \
+                 --mode=time \
+                 --hostname='$HOSTADDRESS$' \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --warning-offset='$_SERVICE_WARNING$' \
+                 --critical-offset='$_SERVICE_CRITICAL$' \
+                 --verbose \
+        $_SERVICEEXTRAOPTIONS$
+}
+                 #--ntp-hostname='$_SERVICENTPHOSTNAME$' \
+                 #--ntp-port='$_SERVICENTPPORT$' \
+                 #--timezone='$_SERVICETIMEZONE$' \
+
+define command{
+        command_name check_snmp_apc_ups_uptime
+        command_line $USER2$/centreon_plugins.pl \
+                 --plugin=hardware::ups::apc::snmp::plugin \
+                 --mode=uptime \
+                 --hostname='$HOSTADDRESS$' \
+                 --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+                 --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+                 --critical-uptime='$_SERVICE_CRITICAL$' \
+                 --verbose \
+        $_SERVICEEXTRAOPTIONS$
+}
+#                 --warning-uptime='$_SERVICE_WARNING$' \

@@ -1,0 +1,7 @@
+define command{
+        command_name check_backup_avamar
+        command_line $USER4$/check_avamar.py \
+                 -H '$HOSTADDRESS$' \
+        $_SERVICE_CRED_GENERIC_SHORT$
+}
+		#$_HOST_CRED_AVAMAR$ \

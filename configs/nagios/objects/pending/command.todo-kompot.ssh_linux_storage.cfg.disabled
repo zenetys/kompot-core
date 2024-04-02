@@ -1,0 +1,16 @@
+define command {
+    command_name check_ssh_linux_storage
+    command_line $USER2$/centreon_plugins.pl \
+        --plugin os::linux::local::plugin \
+        --mode storage \
+        --ssh-backend sshcli \
+        --sshcli-option '-o=StrictHostKeyChecking=no' \
+        --sshcli-option '-o=UserKnownHostsFile=/dev/null' \
+        --hostname '$HOSTADDRESS$' \
+        --timeout $_SERVICE_TIMEOUT$ \
+        $_HOST_CRED_SSH_CENTREON$ \
+        --filter-mountpoint '$_SERVICE_PARTITION$' \
+        --warning-usage '$_SERVICE_WARNING$' \
+        --critical-usage '$_SERVICE_CRITICAL$' \
+        --verbose
+}

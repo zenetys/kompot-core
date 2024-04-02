@@ -1,0 +1,18 @@
+define command {
+	command_name check_snmp_linux_storage_alt
+	command_line $USER2$/centreon_plugins.pl \
+		--plugin=os::linux::snmp::plugin \
+		--mode=storage \
+		--hostname='$HOSTADDRESS$' \
+        --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+        --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+		$_HOST_CRED_SNMP_CENTREON$ \
+		--warning-usage='$_SERVICE_WARNING$' \
+		--critical-usage='$_SERVICE_CRITICAL$' \
+		--storage='$_SERVICE_PARTITION$' \
+		--name \
+		--regexp \
+		--statefile-dir=$USER11$ \
+		--statefile-suffix=_snmp_linux_storage_$HOSTNAME$_$SERVICEDESC$ \
+		--verbose
+}

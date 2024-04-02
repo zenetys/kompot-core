@@ -1,0 +1,25 @@
+define command{
+	command_name check_snmp_interface_oid_type
+	command_line $USER2$/centreon_plugins.pl \
+		--plugin=os::linux::snmp::plugin \
+		--mode=interfaces \
+		--hostname='$HOSTADDRESS$' \
+        --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+        --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+		$_HOST_CRED_SNMP_CENTREON$ \
+		--interface='^$_SERVICE_IFACE$$USER99$' \
+		--name \
+		--add-status \
+		--add-traffic \
+		--critical-status='%{admstatus} ne "$_SERVICE_STATUS_ADMIN$" or %{opstatus} ne "$_SERVICE_STATUS_OPER$"' \
+		--warning-in-traffic='80' \
+		--critical-in-traffic='90' \
+		--warning-out-traffic='80' \
+		--critical-out-traffic='90' \
+        --statefile-dir=$USER11$ \
+		--statefile-suffix=_snmp_interface_$HOSTNAME$_$SERVICEDESC$ \
+		--snmp-autoreduce \
+        --oid-filter '$_SERVICE_OID_FILTER$' \
+        --oid-display '$_SERVICE_OID_DISPLAY$' \
+		--verbose
+}

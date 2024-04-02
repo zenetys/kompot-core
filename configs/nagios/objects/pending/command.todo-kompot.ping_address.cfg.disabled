@@ -1,0 +1,9 @@
+define command {
+    command_name    check_pingz_address
+    command_line    $USER1$/check_ping \
+        --use-ipv'$_SERVICE_IP_VERSION$' \
+        -H '$_SERVICE_ADDRESS$' \
+        -w '$_SERVICE_WARNING_RTA$,$_SERVICE_WARNING_LOSS$' \
+        -c '$_SERVICE_CRITICAL_RTA$,$_SERVICE_CRITICAL_LOSS$' \
+        -t '$_SERVICE_TIMEOUT$'
+}

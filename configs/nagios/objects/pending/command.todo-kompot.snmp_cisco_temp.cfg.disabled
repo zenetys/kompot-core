@@ -1,0 +1,15 @@
+define command {
+    command_name check_snmp_cisco_temp
+    command_line $USER2$/centreon_plugins.pl \
+        --plugin=network::cisco::standard::snmp::plugin \
+        --mode=environment \
+        --hostname='$HOSTADDRESS$' \
+        --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+        --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        --component temperature \
+        --add-name-instance \
+        --warning '$_SERVICE_WARNING$' \
+        --critical '$_SERVICE_CRITICAL$' \
+        --verbose
+}

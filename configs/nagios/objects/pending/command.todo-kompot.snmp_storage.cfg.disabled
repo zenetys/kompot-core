@@ -1,0 +1,34 @@
+define command {
+    command_name check_snmp_storage
+    command_line $USER2$/centreon_plugins.pl \
+        --plugin os::linux::snmp::plugin \
+        --mode storage \
+        --hostname '$HOSTADDRESS$' \
+        --snmp-retries $_SERVICE_SNMP_RETRIES$ \
+        --snmp-timeout $_SERVICE_SNMP_TIMEOUT$ \
+        $_HOST_CRED_SNMP_CENTREON$ \
+        --statefile-dir '$USER11$' \
+        --statefile-suffix _snmp_storage_$HOSTNAME$_$SERVICEDESC$ \
+        --warning-usage '$_SERVICE_WARNING_USAGE$' \
+        --critical-usage '$_SERVICE_CRITICAL_USAGE$' \
+        --warning-access '$_SERVICE_WARNING_ACCESS$' \
+        --critical-access '$_SERVICE_CRITICAL_ACCESS$' \
+        --add-access '$_SERVICE_ADD_ACCESS$' \
+        --units '$_SERVICE_UNITS$' \
+        --free '$_SERVICE_FREE$' \
+        --storage '$_SERVICE_STORAGE$' \
+        --name '$_SERVICE_NAME$' \
+        --regexp '$_SERVICE_REGEXP$' \
+        --regexp-isensitive '$_SERVICE_REGEXP_ISENSITIVE$' \
+        --path-best-match '$_SERVICE_PATH_BEST_MATCH$' \
+        --reload-cache-time '$_SERVICE_RELOAD_CACHE_TIME$' \
+        --oid-filter '$_SERVICE_OID_FILTER$' \
+        --oid-display '$_SERVICE_OID_DISPLAY$' \
+        --display-transform-src '$_SERVICE_DISPLAY_TRANSFORM_SRC$' \
+        --display-transform-dst '$_SERVICE_DISPLAY_TRANSFORM_DST$' \
+        --space-reservation '$_SERVICE_SPACE_RESERVATION$' \
+        --filter-duplicate '$_SERVICE_FILTER_DUPLICATE$' \
+        --filter-storage-type '$_SERVICE_FILTER_STORAGE_TYPE$' \
+        --filter-counters '$_SERVICE_FILTER_COUNTERS$' \
+        --verbose
+}
