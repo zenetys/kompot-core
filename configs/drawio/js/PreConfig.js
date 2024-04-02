@@ -91,3 +91,7 @@ function color(status) {
   let st=ssa[status];
   return(st<=2?"grey":st<=4?"green":st<=5?"yellow":st<=7?"red":"orange");
 }
+
+function state2color(status) {
+  return(status==0?"green":status==1?"yellow":status==2?"red":"orange");
+}
