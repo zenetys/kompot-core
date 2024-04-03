@@ -90,6 +90,9 @@ function lastlog() {
 
 # X-ACTION build <filename.xls>: build config with input filename.xls
 function do_build() {
+  # bash pathname expansion is disabled on top, re-enable it temporarily
+  # note: nullglob is also enabled on top
+  set +f; local args=( /opt/kompot/lib/nagzen/*.cfg "$@" ); set -f
   local cfgdir=$BASEDIR/$(date +%Y%m%d%H%M%S)
   declare -A IPSEC
 
@@ -104,7 +107,7 @@ function do_build() {
   # Source nagzen script with functions to manage centreon objects
   source ${0%/*}/nagzen
 
-  for file in "$@"; do
+  for file in "${args[@]}"; do
     debug -3 "Compiling '$file'"
     if [[ ${file} =~ .*\.cfg$ ]]; then
       local temp=$(mktemp)
