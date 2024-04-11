@@ -32,7 +32,7 @@ function get_tag_state() {
   tag=$1
 
 req_host_state="GET hosts
-Columns: name custom_variable_names custom_variable_values custom_variable state state
+Columns: name custom_variable_names custom_variable_values custom_variable state
 OutputFormat: csv
 Separators: 10 9 44 124
 Filter: custom_variables ~~ _TAGS (^|[, ])$tag($|[, ])"
@@ -42,10 +42,7 @@ Filter: custom_variables ~~ _TAGS (^|[, ])$tag($|[, ])"
 
   for line in "${array[@]}"; do
       tmp_host_state=$(host2svc $(echo $line | awk '{print $NF}'))
-      tmp_svc_state=$(echo $line | awk '{print $(NF-1)}')
-
       [[ $tmp_host_state -gt $host_state ]] && host_state=$tmp_host_state
-      [[ $tmp_svc_state -gt $host_state ]] && host_state=$tmp_svc_state
   done
 
 req_svc_state="GET services
