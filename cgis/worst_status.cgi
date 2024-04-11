@@ -31,8 +31,13 @@ case $1 in
 function get_tag_state() {
   tag=$1
 
-  req_host_state="GET hosts\nColumns: name custom_variable_names custom_variable_values custom_variable worst_service_state state\nOutputFormat: csv\nSeparators: 10 9 44 124\n"
-  readarray -t array <<< $(echo -e "$req_host_state" | unixcat /var/spool/nagios/cmd/live.sock | awk -F '\t' '$2 ~ /_TAGS/ && $3 ~ /#TATAG/ {print}' )
+req_host_state="GET hosts
+Columns: name custom_variable_names custom_variable_values custom_variable state state
+OutputFormat: csv
+Separators: 10 9 44 124
+Filter: custom_variables ~~ _TAGS (^|[, ])$tag($|[, ])"
+
+  readarray -t array <<< $(echo -e "$req_host_state" | unixcat /var/spool/nagios/cmd/live.sock)
   host_state=0
 
   for line in "${array[@]}"; do
@@ -43,8 +48,15 @@ function get_tag_state() {
       [[ $tmp_svc_state -gt $host_state ]] && host_state=$tmp_svc_state
   done
 
-  req_svc_state="GET services\nColumns: host_alias name custom_variable_names custom_variable_values custom_variable state\nOutputFormat: csv\nSeparators: 10 9 44 124\n"
-  readarray -t array <<< $(echo -e "$req_svc_state" | unixcat /var/spool/nagios/cmd/live.sock | awk -F '\t' '$3 ~ /_TAGS/ && $4 ~ /#TATAG/ {print}' )
+req_svc_state="GET services
+Columns: host_alias name custom_variable_names custom_variable_values custom_variable state
+OutputFormat: csv
+Separators: 10 9 44 124
+Filter: custom_variables ~~ _TAGS (^|[, ])$tag($|[, ])
+Filter: host_custom_variables ~~ _TAGS (^|[, ])$tag($|[, ])
+Or: 2"
+
+  readarray -t array <<< $(echo -e "$req_svc_state" | unixcat /var/spool/nagios/cmd/live.sock)
   svc_state=0
 
   for line in "${array[@]}"; do
