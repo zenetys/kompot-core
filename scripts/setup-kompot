@@ -391,10 +391,10 @@ explain install-file --allow-disable /opt/kompot/share/samples/nagzen/100_invent
 # rsyslog
 explain install-file /opt/kompot/share/configs/rsyslog/rsyslog.env /etc/kompot/rsyslog/
 explain install-file /opt/kompot/share/configs/rsyslog/kompot.conf /etc/kompot/rsyslog/
-explain install-file /opt/kompot/share/configs/rsyslog/kompot.rsyslogd.conf /etc/rsyslog.d/50-kompot.conf
+explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/kompot.rsyslogd.conf /etc/rsyslog.d/50-kompot.conf
 explain install-dir /etc/kompot/rsyslog/conf.d
 if ! is_docker; then
-    explain install-file /opt/kompot/share/configs/rsyslog/rsyslog.systemd /etc/systemd/system/rsyslog.service.d/kompot.conf
+    explain install-file --allow-disable /opt/kompot/share/configs/rsyslog/rsyslog.systemd /etc/systemd/system/rsyslog.service.d/kompot.conf
     [[ $REPLY == skip ]] || explain systemctl daemon-reload
 fi
 
