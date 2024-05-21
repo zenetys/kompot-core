@@ -174,20 +174,25 @@ if(!defined $options{l}){  # If no command was given, just output the UPS model
 			# If Okay, then check the date of the last self test before returning result of check
 				# First the returned date is converted to epoch for simplified date math
 				# UPS returns date as mm/dd/yyyy	
-				my @diagdate_split = split(/\//,$diag_date);	
-				my $diagdate_epoch = timelocal(0,0,12,$diagdate_split[1],$diagdate_split[0] - 1,$diagdate_split[2]);
-				my $diag_daysago = int((time - $diagdate_epoch) / 86400 + 0.5);	# How many days since last self test
+				if ($diag_date ne "" && $diag_date ne "Unknown") {
+					my @diagdate_split = split(/\//,$diag_date);	
+					my $diagdate_epoch = timelocal(0,0,12,$diagdate_split[1],$diagdate_split[0] - 1,$diagdate_split[2]);
+					my $diag_daysago = int((time - $diagdate_epoch) / 86400 + 0.5);	# How many days since last self test
 			
-				if (defined $critical_threshold && $diag_daysago > $critical_threshold){
-					print "CRITICAL: Self test last ran on $diag_date ($diag_daysago days ago)\n";
-					exit $CRITICAL;
-				}elsif(defined $warning_threshold && $diag_daysago > $warning_threshold){
-					print "WARNING: Self test last ran on $diag_date ($diag_daysago days ago)\n";
-					exit $WARNING;
-				}else{
+					if (defined $critical_threshold && $diag_daysago > $critical_threshold){
+						print "CRITICAL: Self test last ran on $diag_date ($diag_daysago days ago)\n";
+						exit $CRITICAL;
+					}
+					if(defined $warning_threshold && $diag_daysago > $warning_threshold){
+						print "WARNING: Self test last ran on $diag_date ($diag_daysago days ago)\n";
+						exit $WARNING;
+					}
+
 					print "OK: Self test passed on $diag_date ($diag_daysago days ago)\n";
 					exit $OKAY; 
 				}
+				print "OK: Self last test passed, date $diag_date\n";
+				exit $OKAY; 
 			}
 		}
 		case m/^load$|^load:\d{2,5}$/{	
