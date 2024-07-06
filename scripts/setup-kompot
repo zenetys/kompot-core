@@ -416,7 +416,7 @@ explain install-file -m 400 /opt/kompot/share/configs/sudoers/nagios-handlers /e
 # timezone
 if is_docker; then
     # configuration file /etc/kompot/system/timezone wins
-    tz=$TZ # try from environment
+    tz=$KOMPOT_TZ # try from environment
     [[ -f /etc/kompot/system/timezone ]] && tz=$(< /etc/kompot/system/timezone)
     if [[ -n $tz ]]; then
         if [[ -f /usr/share/zoneinfo/$tz ]]; then
