@@ -11,6 +11,9 @@ elif [[ $MODE == servicestatus ]]; then
   HEADERS=${HEADERS:-"host_name,service_description,current_state"}
 elif [[ $MODE == hoststatus ]]; then
   HEADERS=${HEADERS:-"host_name,current_state"}
+elif [[ $MODE == full ]]; then
+  MODE=hostservice
+  HEADERS=${HEADERS:-"host_name,service_description,current_state,plugin_output"}
 fi
 
 
@@ -93,11 +96,10 @@ BEGIN {
 END {
   exit(EXIT_CODE);
 }
-' < $NAGIOS_STATUS_FILE | sort -k 1 -k 2 -k 3 | column -t
+' < $NAGIOS_STATUS_FILE | sort -k 1 -k 2 -k 3 | column -t -s $'\t' | cut -c3-
 
 if [[ ${PIPESTATUS[0]} != 0 ]]; then
   exit 1
 fi
 
 exit 0
-
