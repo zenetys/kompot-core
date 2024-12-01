@@ -346,8 +346,8 @@ explain install-file /opt/kompot/share/configs/cron/kompot /etc/cron.d/
 explain install-file /etc/cron.d/kompot.local
 
 # drawio
-explain install-dir /etc/kompot/diagrams
-explain install-file --allow-disable /opt/kompot/share/samples/diagrams/BAIE.xml /etc/kompot/diagrams/
+explain install-dir -o apache /etc/kompot/diagrams
+explain install-file -o apache -g apache --allow-disable /opt/kompot/share/samples/diagrams/BAIE.xml /etc/kompot/diagrams/
 
 # grafana
 explain install-file -m 640 -g grafana /opt/kompot/share/configs/grafana/grafana.ini /etc/grafana/
