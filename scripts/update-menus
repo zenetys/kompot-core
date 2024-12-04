@@ -94,7 +94,7 @@ CONFIG_HEADER='{
   "menu": [
     {
       "name": "Bac à état",
-      "url": "/panel",
+      "to": "/panel",
       "icon": "mdi-table",
       "type": "div"
     }'
