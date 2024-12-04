@@ -95,15 +95,13 @@ CONFIG_HEADER='{
     {
       "name": "Bac à état",
       "to": "/panel",
-      "icon": "mdi-table",
-      "type": "div"
+      "icon": "mdi-table"
     }'
 
 IPSLA_HEADER='
     {
       "name": "IPSLA",
       "icon": "mdi-chart-bar",
-      "type": "rrdmenu",
       "subMenus": ['
 
 CONFIG_CLOSE='  ],
@@ -136,7 +134,7 @@ function do_build() {
     echo -n "$hst/$svc: ${site#*;}" >&2
     printf '{'
     printf '"name": "%s","database": "%s:%s",' "${site#*;}" "$hst" "$svc"
-    printf '"url": "/graph/","type": "div",'
+    printf '"to": "/graph/",'
     printf '"datasources": ["RTTMin","AvgJitter","pktLoss"]'
     printf '}'
     echo ", ok" >&2
