@@ -26,8 +26,8 @@ header "Content-Type: text/xml; charset=UTF-8"
 header ""
 
 if [[ $base64 == 1 ]]; then
-  cat $DATADIR/$url.xml | iconv -f utf8 -t iso-8859-1 | base64 -w 0
+  cat $DATADIR/$url.xml | base64 -w 0
 else
-  cat $DATADIR/$url.xml | iconv -f utf8 -t iso-8859-1
+  cat $DATADIR/$url.xml
 fi
 
