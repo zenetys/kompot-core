@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 PROGNAME=${0##*/}
 export PATH="$PATH:${0%/*}"
