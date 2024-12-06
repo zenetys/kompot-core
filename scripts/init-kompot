@@ -27,7 +27,7 @@ function exit_usage() {
     local status=${1:-0}
     [[ "$status" != "0" ]] && exec >&2
     echo "\
-Usage: $PROGNAME [--all] start|stop|restart|condrestart
+Usage: $PROGNAME [--all] status|start|stop|restart|condrestart
 Kompot global init script to start or stop all services
 
 Available options:
@@ -39,6 +39,14 @@ Available options:
     echo 'Services NOT stopped unless --all is given:'
     echo "${!DO_NOT_STOP_SERVICES[@]}" |fold -s -w 50 |sed 's,^,  ,'
     exit "$status"
+}
+
+function do_status() {
+    local retval=0
+    for i in "${SERVICES[@]}"; do
+        zservice qstatus "$i" || retval=1
+    done
+    return "$retval"
 }
 
 # FIXME: Start operation should probably ignore (not an error)
