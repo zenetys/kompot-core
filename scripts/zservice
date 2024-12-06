@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 set -f
 PROGNAME=${0##*/}
@@ -9,7 +9,7 @@ function exit_usage() {
     local status=${1:-0}
     [[ "$status" != "0" ]] && exec >&2
     echo "\
-Usage: $PROGNAME status|start|stop|restart|reload|condrestart SERVICE...
+Usage: $PROGNAME [q]status|start|stop|restart|reload|condrestart SERVICE...
        $PROGNAME platform
 Abstraction script to manage services on different platforms"
     exit "$status"
@@ -40,6 +40,19 @@ function get-service-platform() {
 
 # systemd implementation
 function do-systemd-status() { systemctl status "$@"; }
+
+function do-systemd-qstatus() {
+    local i ret=0
+    for i in "$@"; do
+        local ActiveState= MainPID=
+        source <(systemctl show -p ActiveState -p MainPID "$i")
+        [[ $MainPID == 0 ]] && MainPID=
+        echo "$i: ${ActiveState:-unknown}${MainPID:+ (pid $MainPID)}"
+        [[ $ActiveState == active ]] || ret=1
+    done
+    return "$ret"
+}
+
 function do-systemd-start() { systemctl start "$@"; }
 function do-systemd-stop() { systemctl stop "$@"; }
 function do-systemd-restart() { systemctl restart "$@"; }
@@ -59,6 +72,7 @@ function do-runit-status() {
     return 0
 }
 
+function do-runit-qstatus() { do-runit-status "$@"; }
 function do-runit-start() { sv start "${@/#/$RUNIT_SV_DIR/}"; }
 function do-runit-stop() { sv stop "${@/#/$RUNIT_SV_DIR/}"; }
 function do-runit-restart() { sv restart "${@/#/$RUNIT_SV_DIR/}"; }
@@ -82,6 +96,7 @@ function do-sysv-status() {
     return "$ret"
 }
 
+function do-sysv-qstatus() { do-sysv-status "$@"; }
 function do-sysv-start() { SYSV_ACTION=start do-sysv-status "$@"; }
 function do-sysv-stop() { SYSV_ACTION=stop do-sysv-status "$@"; }
 function do-sysv-restart() { SYSV_ACTION=restart do-sysv-status "$@"; }
