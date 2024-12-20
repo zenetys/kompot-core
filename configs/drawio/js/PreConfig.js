@@ -36,7 +36,7 @@ urlParams['gh'] = 0;
 urlParams['gl'] = 0;
 urlParams['drive'] = 0;
 urlParams['mode'] = 'browser';
-// urlParams['offline'] = 1;
+urlParams['offline'] = 1;
 urlParams['pwa'] = 0;
 
 function cState2(h,s) {
