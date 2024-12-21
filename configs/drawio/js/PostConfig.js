@@ -9,14 +9,5 @@ window.ICONSEARCH_PATH = null;
 
 window.App.pluginRegistry.live = 'js/live.js';
 
-(function () {
-    function forceRegisterPluginViaUrlParams(id) {
-        plist = typeof urlParams.p === 'string' && urlParams.p.length > 0
-            ? urlParams.p.split(';') : [];
-        if (plist.indexOf(id) == -1)
-            plist.push(id);
-        urlParams.p = plist.join(';');
-    }
-
-    forceRegisterPluginViaUrlParams('live');
-})();
+App.initPluginCallback();
+App.loadPlugins(['live']);
