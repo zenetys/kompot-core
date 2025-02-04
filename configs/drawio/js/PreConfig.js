@@ -12,6 +12,8 @@ window.DRAWIO_LIGHTBOX_URL = null; // Replace with your lightbox URL, eg. https:
 window.DRAW_MATH_URL = 'math/es5';
 window.DRAWIO_CONFIG = null; // Replace with your custom draw.io configurations. For more details, https://www.drawio.com/doc/faq/configure-diagram-editor
 
+window.ALLOW_CUSTOM_PLUGINS = true;
+
 window.mxLanguageMap = {
     i18n: '',
     en: 'English',
@@ -36,7 +38,7 @@ urlParams['gh'] = 0;
 urlParams['gl'] = 0;
 urlParams['drive'] = 0;
 urlParams['mode'] = 'browser';
-urlParams['offline'] = 1;
+urlParams['offline'] = 0;
 urlParams['pwa'] = 0;
 
 function cState2(h,s) {
