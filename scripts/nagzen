@@ -286,9 +286,9 @@ declare IS_HOST_TEMPLATE
 
 # set
 
-trap host-end EXIT
-
 (( ${#BASH_SOURCE[@]} > 1 )) && return
+
+trap host-end EXIT
 
 while (( $# > 0 )); do
   case "$1" in
