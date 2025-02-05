@@ -327,6 +327,3 @@ ACTION=${ARGS[0]}; ARGS=( ${ARGS[@]:1} )
 
 declare -f do_$ACTION > /dev/null ||
   fatal "undefine action '$ACTION'"
-
-
-
