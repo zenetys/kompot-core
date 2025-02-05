@@ -85,7 +85,18 @@ function version() {
 }
 
 function lastlog() {
-    tail -n 30 "$NAGIOSLOG" |grep --color=auto -E '^|^\[[0-9]+\] (Error|Warning):.*'
+    debug 'Attempt to display last error logs from Nagios:'
+    echo -n $'\x1b[0;91m'
+    if [[ $(ps -q 1 --no-headers -o comm) == systemd ]] && type -p journalctl >/dev/null; then
+        journalctl -u nagios --no-pager -n 200 -r
+    else
+        tail -n 200 /var/log/messages |tac
+    fi |awk '
+        /nagios[^:]*: (Error|Warning):/ { line[++nline] = $0; }
+        /nagios[^:]*: (Nagios Core [0-9]|Copyright)/ { exit; }
+        END { for (i = nline; i > 0; i--) print line[i]; }
+    '
+    echo -n $'\x1b[0m'
 }
 
 # X-ACTION build <filename.xls>: build config with input filename.xls
