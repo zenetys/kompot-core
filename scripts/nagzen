@@ -149,6 +149,7 @@ function host() {
   [[ ${1} == --template ]] && hostid="_${hostid,,}"
 
   CURRENT_HOST="$hostid"
+  CURRENT_HOST_ADDRESS=
   HOST_TEMPLATE[$CURRENT_HOST]="$use"
   HOST_FULLNAME[$CURRENT_HOST]="$dname"
 
@@ -170,6 +171,7 @@ function host() {
       address="${1:10}"
       use="${use:-$DEFAULT_HOST_TEMPLATE}"
     )
+    CURRENT_HOST_ADDRESS="${1:10}"
     shift
   else
     fatal "bad parameter $1, bypass"
