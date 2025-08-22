@@ -413,6 +413,15 @@ explain install-file -m 400 /opt/kompot/share/configs/sudoers/nagios-handlers /e
 
 # PREPARE SYSTEM AND SERVICES
 
+# vsphere perl modules
+if is_docker && [[ -d /etc/kompot/system && -x /opt/centreon-vmware/share/install-vmware-perl-modules ]]; then
+    vsphere_tarball=$(find /etc/kompot/system/ -mindepth 1 -maxdepth 1 -name 'VMware-vSphere-Perl-SDK*.tar.gz' |sort -rV |head -n 1)
+    vsan_zip=$(find /etc/kompot/system/ -mindepth 1 -maxdepth 1 -name 'vsan-sdk-perl*.zip' |sort -rV |head -n 1)
+    if [[ -n $vsphere_tarball && -n $vsan_zip ]]; then
+        explain /opt/centreon-vmware/share/install-vmware-perl-modules --vsphere "$vsphere_tarball" --vsan "$vsan_zip"
+    fi
+fi
+
 # timezone
 if is_docker; then
     # configuration file /etc/kompot/system/timezone wins
