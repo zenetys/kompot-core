@@ -413,6 +413,17 @@ explain install-file -m 400 /opt/kompot/share/configs/sudoers/nagios-handlers /e
 
 # PREPARE SYSTEM AND SERVICES
 
+# rpms
+if is_docker && [[ -d /etc/kompot/system ]]; then
+    rpms=( $(find /etc/kompot/system/ -mindepth 1 -maxdepth 1 -name '*.rpm' |
+                awk -v OFS="\t" '{x="rpm -qp --qf \x27%{nevra}\t%{name}\x27 "$0; (x|getline $2); close(x);} {print}' |
+                sort -k2Vr |
+                awk -F "\t" 'seen[$3]==1 {next;} { if($3)seen[$3]=1; print $1; }') )
+    if [[ -n $rpms ]]; then
+        explain rpm -Uvh "${rpms[@]}"
+    fi
+fi
+
 # vsphere perl modules
 if is_docker && [[ -d /etc/kompot/system && -x /opt/centreon-vmware/share/install-vmware-perl-modules ]]; then
     vsphere_tarball=$(find /etc/kompot/system/ -mindepth 1 -maxdepth 1 -name 'VMware-vSphere-Perl-SDK*.tar.gz' |sort -rV |head -n 1)
