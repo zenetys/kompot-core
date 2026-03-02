@@ -1,0 +1,238 @@
+#!/usr/bin/gawk -f
+#
+# naglog2sql - Parse nagios.log from stdin and generate SQLite UPSERT SQL
+#
+# Usage:
+#   cat nagios.log | naglog2sql | sqlite3 nagios.db
+#   cat nagios.log | naglog2sql -v DEBUG=1 | sqlite3 nagios.db
+#   tail -f nagios.log | naglog2sql | sqlite3 nagios.db
+#
+#   With schema init:
+#   cat nagios.log | naglog2sql -v INIT=1 | sqlite3 nagios.db
+#
+#   With batched transactions (commit every N lines):
+#   cat nagios.log | naglog2sql -v BATCH=1000 | sqlite3 nagios.db
+#
+# Inspired by logmatch
+
+function fatal(output) {
+  printf("[FATAL] %s\n", output) >"/dev/stderr";
+}
+
+function debug(output) {
+  if (DEBUG) {
+    printf("[DEBUG] %s\n", output) >"/dev/stderr";
+  }
+}
+
+function sql_escape(s) {
+  gsub(/'/, "''", s);
+  return s;
+}
+
+# Convert value to SQL: empty string becomes NULL, otherwise quoted string
+function sql_str(s) {
+  if (s == "") return "NULL";
+  return "'" sql_escape(s) "'";
+}
+
+function emit_state_insert(ts, hostname, service, state, state_type, attempt, output) {
+  # attempt="" means NULL (for initial states), service="" means NULL (for hosts)
+  attempt_sql = (attempt == "") ? "NULL" : attempt;
+  printf("INSERT INTO state (hostname, service, state, state_type, attempt, output, timestamp)" \
+         " VALUES ('%s', %s, '%s', '%s', %s, '%s', datetime(%d, 'unixepoch'));\n",
+         sql_escape(hostname), sql_str(service),
+         sql_escape(state), sql_escape(state_type),
+         attempt_sql, sql_escape(output), ts);
+}
+
+function emit_notification_insert(ts, contact, hostname, service, state, command, output) {
+  printf("INSERT INTO notification (contact, hostname, service, state, command, output, timestamp)" \
+         " VALUES ('%s', '%s', %s, '%s', '%s', '%s', datetime(%d, 'unixepoch'));\n",
+         sql_escape(contact), sql_escape(hostname), sql_str(service),
+         sql_escape(state), sql_escape(command), sql_escape(output), ts);
+}
+
+function emit_external_insert(ts, command, hostname, service, data) {
+  printf("INSERT INTO external (command, hostname, service, data, timestamp)" \
+         " VALUES ('%s', %s, %s, '%s', datetime(%d, 'unixepoch'));\n",
+         sql_escape(command), sql_str(hostname), sql_str(service), sql_escape(data), ts);
+}
+
+function emit_event_insert(ts, event, data) {
+  printf("INSERT INTO system (event, data, timestamp)" \
+         " VALUES ('%s', '%s', datetime(%d, 'unixepoch'));\n",
+         sql_escape(event), sql_escape(data), ts);
+}
+
+function parse_line(line,    ts, event, data, a, n, p) {
+  # Parse: [timestamp] EVENT TYPE: data
+  # Format: [1769990400] CURRENT HOST STATE: hostname;...
+  if (substr(line, 1, 1) != "[") {
+    printf("[SKIP] %s\n", line) >"/dev/stderr";
+    return;
+  }
+  p = index(line, "] ");
+  if (!p) {
+    printf("[SKIP] %s\n", line) >"/dev/stderr";
+    return;
+  }
+  ts = strtonum(substr(line, 2, p - 2));
+  line = substr(line, p + 2);
+  p = index(line, ": ");
+  if (!p) {
+    # No ": " separator - treat entire line as a warning/info message
+    emit_event_insert(ts, "Warning", line);
+    return;
+  }
+  event = substr(line, 1, p - 1);
+  data  = substr(line, p + 2);
+
+  if (event == "INITIAL HOST STATE" || event == "CURRENT HOST STATE") {
+    # hostname;state;state_type;attempt;output - use attempt=NULL for startup states
+    n = split(data, a, ";");
+    if (n < 5) { debug(sprintf("bad host line: <%s>", data)); return; }
+    emit_state_insert(ts, a[1], "", a[2], a[3], "", a[5]);
+  }
+  else if (event == "HOST ALERT") {
+    # hostname;state;state_type;attempt;output
+    n = split(data, a, ";");
+    if (n < 5) { debug(sprintf("bad host line: <%s>", data)); return; }
+    emit_state_insert(ts, a[1], "", a[2], a[3], strtonum(a[4]), a[5]);
+  }
+  else if (event == "INITIAL SERVICE STATE" || event == "CURRENT SERVICE STATE") {
+    # hostname;service;state;state_type;attempt;output - use attempt=NULL for startup states
+    n = split(data, a, ";");
+    if (n < 6) { debug(sprintf("bad service line: <%s>", data)); return; }
+    emit_state_insert(ts, a[1], a[2], a[3], a[4], "", a[6]);
+  }
+  else if (event == "SERVICE ALERT") {
+    # hostname;service;state;state_type;attempt;output
+    n = split(data, a, ";");
+    if (n < 6) { debug(sprintf("bad service line: <%s>", data)); return; }
+    emit_state_insert(ts, a[1], a[2], a[3], a[4], strtonum(a[5]), a[6]);
+  }
+  else if (event == "SERVICE FLAPPING ALERT") {
+    # hostname;service;STARTED|STOPPED;message
+    n = split(data, a, ";");
+    if (n < 4) { debug(sprintf("bad flapping line: <%s>", data)); return; }
+    emit_state_insert(ts, a[1], a[2], "FLAPPING_" a[3], "HARD", 0, a[4]);
+  }
+  else if (event == "HOST FLAPPING ALERT") {
+    # hostname;STARTED|STOPPED;message
+    n = split(data, a, ";");
+    if (n >= 3) {
+      emit_state_insert(ts, a[1], "", "FLAPPING_" a[2], "HARD", 0, a[3]);
+    }
+  }
+  else if (event == "SERVICE NOTIFICATION") {
+    # contact;hostname;service;state;command;output
+    n = split(data, a, ";");
+    if (n >= 6) {
+      emit_notification_insert(ts, a[1], a[2], a[3], a[4], a[5], a[6]);
+    }
+  }
+  else if (event == "HOST NOTIFICATION") {
+    # contact;hostname;state;command;output
+    n = split(data, a, ";");
+    if (n >= 5) {
+      emit_notification_insert(ts, a[1], a[2], "", a[3], a[4], a[5]);
+    }
+  }
+  else if (event == "EXTERNAL COMMAND") {
+    # COMMAND;hostname;service;... or COMMAND;hostname;...
+    n = split(data, a, ";");
+    if (n < 1) return;
+    cmd = a[1];
+    # Service commands: *_SVC_* have hostname;service;...
+    # Host commands: *_HOST_* (without SVC) have hostname;...
+    if (index(cmd, "_SVC_") > 0) {
+      # command;hostname;service;rest...
+      hostname = (n >= 2) ? a[2] : "";
+      service  = (n >= 3) ? a[3] : "";
+      rest = "";
+      for (i = 4; i <= n; i++) { rest = rest (i > 4 ? ";" : "") a[i]; }
+      emit_external_insert(ts, cmd, hostname, service, rest);
+    }
+    else if (index(cmd, "_HOST_") > 0 || index(cmd, "_HOST") == length(cmd) - 4) {
+      # command;hostname;rest...
+      hostname = (n >= 2) ? a[2] : "";
+      rest = "";
+      for (i = 3; i <= n; i++) { rest = rest (i > 3 ? ";" : "") a[i]; }
+      emit_external_insert(ts, cmd, hostname, "", rest);
+    }
+    else {
+      # Unknown format, store everything in data
+      rest = "";
+      for (i = 2; i <= n; i++) { rest = rest (i > 2 ? ";" : "") a[i]; }
+      emit_external_insert(ts, cmd, "", "", rest);
+    }
+  }
+  else if (event == "neb2log" || event == "livestatus" || event == "wproc" || event == "qh" || event == "nerd") {
+    # silently ignored
+  }
+  else {
+    emit_event_insert(ts, event, data);
+  }
+}
+
+BEGIN {
+  if (DEBUG >= 1) {
+    printf("[DEBUG] naglog2sql starting\n") >"/dev/stderr";
+  }
+
+  if (INIT) {
+    # Tables
+    print "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY AUTOINCREMENT, hostname TEXT NOT NULL, service TEXT, state TEXT NOT NULL, state_type TEXT NOT NULL, attempt INTEGER, output TEXT, timestamp TEXT NOT NULL);";
+    print "CREATE TABLE IF NOT EXISTS notification (id INTEGER PRIMARY KEY AUTOINCREMENT, contact TEXT NOT NULL, hostname TEXT NOT NULL, service TEXT, state TEXT NOT NULL, command TEXT, output TEXT, timestamp TEXT NOT NULL);";
+    print "CREATE TABLE IF NOT EXISTS external (id INTEGER PRIMARY KEY AUTOINCREMENT, command TEXT NOT NULL, hostname TEXT, service TEXT, data TEXT, timestamp TEXT NOT NULL);";
+    print "CREATE TABLE IF NOT EXISTS system (id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL, data TEXT, timestamp TEXT NOT NULL);";
+
+    # Indexes for state table
+    print "CREATE INDEX IF NOT EXISTS idx_state_timestamp ON state(timestamp);";
+    print "CREATE INDEX IF NOT EXISTS idx_state_hostname ON state(hostname);";
+    print "CREATE INDEX IF NOT EXISTS idx_state_host_service ON state(hostname, service);";
+    print "CREATE INDEX IF NOT EXISTS idx_state_host_service_ts ON state(hostname, service, timestamp);";
+    print "CREATE INDEX IF NOT EXISTS idx_state_state ON state(state);";
+
+    # Indexes for notification table
+    print "CREATE INDEX IF NOT EXISTS idx_notification_timestamp ON notification(timestamp);";
+    print "CREATE INDEX IF NOT EXISTS idx_notification_hostname ON notification(hostname);";
+    print "CREATE INDEX IF NOT EXISTS idx_notification_host_service ON notification(hostname, service);";
+    print "CREATE INDEX IF NOT EXISTS idx_notification_state ON notification(state);";
+
+    # Indexes for external table
+    print "CREATE INDEX IF NOT EXISTS idx_external_timestamp ON external(timestamp);";
+    print "CREATE INDEX IF NOT EXISTS idx_external_hostname ON external(hostname);";
+    print "CREATE INDEX IF NOT EXISTS idx_external_host_service ON external(hostname, service);";
+    print "CREATE INDEX IF NOT EXISTS idx_external_command ON external(command);";
+
+    # Indexes for system table
+    print "CREATE INDEX IF NOT EXISTS idx_system_timestamp ON system(timestamp);";
+    print "CREATE INDEX IF NOT EXISTS idx_system_event ON system(event);";
+
+    # Availability cache table (populated by naghistory-cache)
+    print "CREATE TABLE IF NOT EXISTS availability_cache (hostname TEXT NOT NULL, service TEXT, date TEXT NOT NULL, available INTEGER NOT NULL DEFAULT 0, unavailable INTEGER NOT NULL DEFAULT 0, unknown INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (hostname, service, date));";
+    print "CREATE INDEX IF NOT EXISTS idx_availability_cache_date ON availability_cache(date);";
+  }
+
+  printf("BEGIN;\n");
+
+  LINES = 0;
+
+  while ((getline line < "/dev/stdin") > 0) {
+    LINES++;
+    parse_line(line);
+
+    if (BATCH > 0 && LINES % BATCH == 0) {
+      printf("COMMIT;\nBEGIN;\n");
+      fflush();
+    }
+  }
+
+  printf("COMMIT;\n");
+
+  if (DEBUG >= 1) {
+    printf("[DEBUG] naglog2sql done: %d lines processed\n", LINES) >"/dev/stderr";
+  }
+}
