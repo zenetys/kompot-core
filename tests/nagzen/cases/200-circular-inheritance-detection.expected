@@ -1,0 +1,7 @@
+#### _a:_b ####
+define host {
+  register             0
+  name                 _a
+  use                  _b
+}
+

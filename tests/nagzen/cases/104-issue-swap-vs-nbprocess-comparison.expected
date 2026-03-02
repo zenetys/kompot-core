@@ -1,0 +1,52 @@
+define service {
+  check_command        check-dummy
+  __WARNING            80
+  __CRITICAL           90
+  register             0
+  name                 snmp-linux-swap
+  use                  generic-service
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _linux:swap
+  display_name         SWAP
+  use                  snmp-linux-swap
+}
+define service {
+  __WARNING            300
+  __CRITICAL           330
+  register             0
+  name                 _linux:nb-process
+  display_name         NB-PROCESS
+  use                  generic-service
+}
+
+#### testhost:_linux ####
+define host {
+  host_name            testhost
+  display_name         testhost
+  address              192.168.1.1
+  use                  _linux
+}
+define service {
+  __WARNING            100
+  __CRITICAL           190
+  service_description  SWAP
+  display_name         SWAP
+  host_name            testhost
+  use                  _linux:swap
+}
+define service {
+  __WARNING            111
+  service_description  NB-PROCESS
+  display_name         NB-PROCESS
+  host_name            testhost
+  use                  _linux:nb-process
+}
+

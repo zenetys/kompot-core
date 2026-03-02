@@ -1,0 +1,99 @@
+#### _os ####
+define host {
+  register             0
+  name                 _os
+  use                  generic-host
+}
+
+#### _linux:_os ####
+define host {
+  register             0
+  name                 _linux
+  use                  _os
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### _custom:_linux ####
+define host {
+  register             0
+  name                 _custom
+  use                  _linux
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _custom:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+define service {
+  register             0
+  name                 _custom:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _custom:adm-ssh
+}
+define service {
+  __PORT               2244
+  register             0
+  name                 _linux:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh
+}
+
+#### myserver1:_os ####
+define host {
+  host_name            myserver1
+  display_name         myserver1
+  address              192.168.1.1
+  use                  _os
+}
+
+#### myserver2:_linux ####
+define host {
+  host_name            myserver2
+  display_name         myserver2
+  address              192.168.1.2
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver2
+  use                  _linux:adm-ssh__1
+}
+
+#### myserver3:_custom ####
+define host {
+  host_name            myserver3
+  display_name         myserver3
+  address              192.168.1.3
+  use                  _custom
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver3
+  use                  _custom:adm-ssh__1
+}
+
+#### myserver4:_linux ####
+define host {
+  host_name            myserver4
+  display_name         myserver4
+  address              192.168.1.4
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver4
+  use                  _linux:adm-ssh__1
+}
+

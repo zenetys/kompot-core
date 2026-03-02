@@ -1,0 +1,58 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+
+#### _webserver:_linux ####
+define host {
+  register             0
+  name                 _webserver
+  use                  _linux
+}
+define service {
+  register             0
+  name                 _webserver:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _webserver:adm-https
+  display_name         ADM-HTTPS
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _webserver:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+#### myserver:_webserver ####
+define host {
+  host_name            myserver
+  display_name         myserver
+  address              10.0.0.1
+  use                  _webserver
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver
+  use                  _webserver:adm-ssh
+}
+define service {
+  service_description  ADM-HTTPS
+  display_name         ADM-HTTPS
+  host_name            myserver
+  use                  _webserver:adm-https
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            myserver
+  use                  _webserver:cpu
+}
+

@@ -1,0 +1,105 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  __WARNING            80
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+define service {
+  __PORT               2244
+  register             0
+  name                 _linux:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh
+}
+
+define service {
+  __WARNING            90
+  register             0
+  name                 _linux:cpu__1
+  display_name         CPU
+  use                  _linux:cpu
+}
+
+define service {
+  __PORT               2222
+  register             0
+  name                 _linux:adm-ssh__2
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh__1
+}
+
+#### server1:_linux ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server1
+  use                  _linux:adm-ssh__2
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            server1
+  use                  _linux:cpu__1
+}
+
+#### server2:_linux ####
+define host {
+  host_name            server2
+  display_name         server2
+  address              10.0.0.2
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server2
+  use                  _linux:adm-ssh__2
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            server2
+  use                  _linux:cpu__1
+}
+
+#### server3:_linux ####
+define host {
+  host_name            server3
+  display_name         server3
+  address              10.0.0.3
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server3
+  use                  _linux:adm-ssh__2
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            server3
+  use                  _linux:cpu__1
+}
+

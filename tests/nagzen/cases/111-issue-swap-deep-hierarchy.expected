@@ -1,0 +1,86 @@
+define service {
+  check_command        check-dummy
+  __WARNING            80
+  __CRITICAL           90
+  register             0
+  name                 snmp-linux-swap
+  use                  generic-service
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _linux:swap
+  display_name         SWAP
+  use                  snmp-linux-swap
+}
+define service {
+  __WARNING            300
+  __CRITICAL           330
+  register             0
+  name                 _linux:nb-process
+  display_name         NB-PROCESS
+  use                  generic-service
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### _custom-linux:_linux ####
+define host {
+  register             0
+  name                 _custom-linux
+  use                  _linux
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _custom-linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### _my-custom:_custom-linux ####
+define host {
+  register             0
+  name                 _my-custom
+  use                  _custom-linux
+}
+
+#### myserver:_my-custom ####
+define host {
+  host_name            myserver
+  display_name         myserver
+  address              10.0.0.1
+  use                  _my-custom
+}
+define service {
+  __WARNING            50
+  __CRITICAL           80
+  service_description  SWAP
+  display_name         SWAP
+  host_name            myserver
+  use                  _linux:swap
+}
+define service {
+  __WARNING            200
+  service_description  NB-PROCESS
+  display_name         NB-PROCESS
+  host_name            myserver
+  use                  _linux:nb-process
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver
+  use                  _custom-linux:adm-ssh
+}
+

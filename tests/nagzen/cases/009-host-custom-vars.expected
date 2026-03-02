@@ -1,0 +1,17 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+
+#### myserver:_linux ####
+define host {
+  __TAGS               #production
+  __ENVIRONMENT        prod
+  host_name            myserver
+  display_name         myserver
+  address              192.168.1.50
+  use                  _linux
+}
+

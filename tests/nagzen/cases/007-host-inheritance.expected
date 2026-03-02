@@ -1,0 +1,72 @@
+#### _ping ####
+define host {
+  register             0
+  name                 _ping
+  use                  generic-host
+}
+
+#### _level1:_ping ####
+define host {
+  register             0
+  name                 _level1
+  use                  _ping
+}
+define service {
+  register             0
+  name                 _level1:ping
+  display_name         PING
+  use                  generic-service
+}
+
+#### _level2:_level1 ####
+define host {
+  register             0
+  name                 _level2
+  use                  _level1
+}
+define service {
+  register             0
+  name                 _level2:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### _level3:_level2 ####
+define host {
+  register             0
+  name                 _level3
+  use                  _level2
+}
+define service {
+  register             0
+  name                 _level3:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+#### final:_level3 ####
+define host {
+  host_name            final
+  display_name         final
+  address              10.0.0.1
+  use                  _level3
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            final
+  use                  _level3:cpu
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            final
+  use                  _level2:adm-ssh
+}
+define service {
+  service_description  PING
+  display_name         PING
+  host_name            final
+  use                  _level1:ping
+}
+
