@@ -1,0 +1,10 @@
+=== First run ===
+old1
+old2
+=== After rotation to empty ===
+(end)
+inode_updated: yes
+=== Third run (no re-detect) ===
+(end)
+=== After append ===
+new_data

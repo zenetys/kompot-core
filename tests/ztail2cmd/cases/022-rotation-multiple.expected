@@ -1,0 +1,10 @@
+=== Round 1 ===
+round1
+=== Round 2 (after rename rotation) ===
+round2
+=== Round 3 (after truncate rotation) ===
+r3
+=== Round 4 (after delete+touch+append) ===
+round4
+=== Round 5 (normal append) ===
+round5
