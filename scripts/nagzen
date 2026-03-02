@@ -14,7 +14,7 @@ set -o pipefail
 set -f
 
 PROGNAME=${0##*/}
-USAGE="${PROGNAME} [OPTIONS] {-f FILENAME|ACTION ...}"
+USAGE="${PROGNAME} [OPTIONS] -f FILENAME"
 
 function log() {
     local i
@@ -72,14 +72,6 @@ function usage() {
       printf " %-20s %s\n" "$OPT" "$DESC"
     done
   echo
-
-  echo "<ACTION> is one of :"
-  sed -nr "s/^# X-ACTION ([^:]*): /\1\t/p" -- "$0" |
-    while read OPT DESC ; do
-      printf " %s\n     %s\n" "$OPT" "$DESC"
-    done
-  echo
-
   return 0
 }
 
@@ -136,10 +128,6 @@ function dump_nagios_object() {
   echo "}"
 }
 
-# X-ACTION addHost NAME [ATTRS]: add host with attributs
-function addHost() {
-  fatal not-implemented
-}
 function host() {
   debug -3 "$FUNCNAME $*"
   local use=${1#*:} && [[ $use = $1 ]] && unset use
@@ -332,10 +320,5 @@ done
 
 [[ -r $SOURCE ]] && source $SOURCE && exit $?
 
-[[ -z ${ARGS[@]} ]] &&
-  fatal --usage "need ACTION"
-
-ACTION=${ARGS[0]}; ARGS=( ${ARGS[@]:1} )
-
-declare -f do_$ACTION > /dev/null ||
-  fatal "undefine action '$ACTION'"
+[[ ${#ARGS[@]} -eq 0 ]] &&
+  fatal --usage "need -f FILENAME"
