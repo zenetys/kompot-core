@@ -93,6 +93,160 @@ function build_key() {
   printf -v $__k "%s" "$__v"
 }
 
+# Check for circular inheritance in host template chain
+# Returns 0 if no cycle, exits with fatal if cycle detected
+function check_circular_inheritance() {
+  local start=$1
+  local tpl=${HOST_TEMPLATE[${start}]}
+  local -A visited=()
+  visited[${start}]=1
+
+  while [[ ${tpl} ]]; do
+    if [[ ${visited[${tpl}]} ]]; then
+      fatal "circular inheritance detected: ${start} -> ... -> ${tpl}"
+    fi
+    visited[${tpl}]=1
+    tpl=${HOST_TEMPLATE[${tpl}]}
+  done
+  return 0
+}
+
+# Find service template in inheritance chain
+# Usage: find_service_template HOST_TPL SERVICE_DESC [LATEST]
+# Sets REPLY to service template name
+# If LATEST=1, returns the override version (__N) if it exists
+# Returns 0 if found, 1 if not found in hierarchy
+function find_service_template() {
+  local host_tpl=$1
+  local desc=$2
+  local latest=${3:-0}
+  REPLY=""
+
+  while [[ ${host_tpl} ]]; do
+    if [[ ${SERVICES[${host_tpl}:${desc}]} ]]; then
+      REPLY="${SERVICES[${host_tpl}:${desc}]}"
+      if [[ $latest == 1 ]]; then
+        local count=${SERVICE_OVERRIDE_COUNT[${host_tpl}:${desc}]:-0}
+        (( count > 0 )) && REPLY="${host_tpl}:${desc}__${count}"
+      fi
+      return 0
+    fi
+    host_tpl=${HOST_TEMPLATE[${host_tpl}]}
+  done
+  return 1
+}
+
+# Find a host attribute by walking up the host template chain.
+# Sets REPLY to the attribute value if found.
+# Returns 0 if found, 1 otherwise.
+function find_host_attr() {
+  local host_tpl=$1
+  local attr=$2
+  REPLY=""
+
+  while [[ ${host_tpl} ]]; do
+    if [[ ${HOST_ATTRS[${host_tpl}:${attr}]+set} ]]; then
+      REPLY="${HOST_ATTRS[${host_tpl}:${attr}]}"
+      return 0
+    fi
+    host_tpl=${HOST_TEMPLATE[${host_tpl}]}
+  done
+  return 1
+}
+
+# Mark a template and all its ancestors as having a concrete host.
+# This prevents reopening any template in the chain.
+# Usage: mark_template_chain_used TEMPLATE "hostname at file:line"
+function mark_template_chain_used() {
+  local tpl=$1
+  local host_info=$2
+
+  while [[ ${tpl} ]]; do
+    # Only set if not already set (preserve first host info)
+    [[ -z ${TEMPLATE_HAS_CONCRETE[${tpl}]} ]] && \
+      TEMPLATE_HAS_CONCRETE[${tpl}]="${host_info}"
+    tpl=${HOST_TEMPLATE[${tpl}]}
+  done
+}
+
+# Check if a template is a descendant of another template
+# Returns 0 if child_tpl inherits from ancestor_tpl (directly or indirectly)
+function is_descendant_of() {
+  local child_tpl=$1
+  local ancestor_tpl=$2
+  local tpl=${HOST_TEMPLATE[${child_tpl}]}
+
+  while [[ ${tpl} ]]; do
+    [[ ${tpl} == "${ancestor_tpl}" ]] && return 0
+    tpl=${HOST_TEMPLATE[${tpl}]}
+  done
+  return 1
+}
+
+# Propagate service updates to all child templates after a reopen
+# Usage: propagate_to_children REOPENED_TEMPLATE SERVICE_DESC SERVICE_DISPLAY
+function propagate_to_children() {
+  local reopened_tpl=$1
+  local svc_desc=$2
+  local svc_display=$3
+  local child_tpl
+
+  # Find the latest service template from the reopened template
+  local latest_svc
+  if ! find_service_template "${reopened_tpl}" "${svc_desc}" 1; then
+    return 0  # No service to propagate
+  fi
+  latest_svc="$REPLY"
+
+  # Iterate over all templates to find descendants
+  for child_tpl in "${!HOSTS[@]}"; do
+    # Skip non-templates and the reopened template itself
+    [[ ${child_tpl:0:1} != "_" ]] && continue
+    [[ ${child_tpl} == "${reopened_tpl}" ]] && continue
+
+    # Check if this template is a descendant of the reopened template
+    if ! is_descendant_of "${child_tpl}" "${reopened_tpl}"; then
+      continue
+    fi
+
+    # Check if this child has this service
+    local child_svc="${SERVICES[${child_tpl}:${svc_desc}]}"
+    if [[ -z ${child_svc} ]]; then
+      # Child doesn't have this service yet - add it as inherited
+      SERVICES[${child_tpl}:${svc_desc}]="${latest_svc}"
+      HOST_SERVICES[${child_tpl}]+="${svc_display}${LIST_SEP}"
+      continue
+    fi
+
+    # Check if this is an explicitly declared service (has SERVICE_USE set)
+    local child_use="${SERVICE_USE[${child_tpl}:${svc_desc}]}"
+    if [[ ${child_use} ]]; then
+      # Explicitly declared service - preserve child's override
+      # Create new intermediate that inherits from child's current template
+      (( ++SERVICE_OVERRIDE_COUNT[${child_tpl}:${svc_desc}] ))
+      local count=${SERVICE_OVERRIDE_COUNT[${child_tpl}:${svc_desc}]}
+      local new_template="${child_tpl}:${svc_desc}__${count}"
+      local display
+      # Find display name from HOST_SERVICES
+      for display in ${HOST_SERVICES[${child_tpl}]}; do
+        local desc_check
+        build_key -v desc_check "${display,,}"
+        [[ ${desc_check} == "${svc_desc}" ]] && break
+      done
+      # Use child_svc (the child's template) to preserve overrides like __PORT
+      dump_nagios_object service \
+        "register=0" \
+        "name=${new_template}" \
+        "display_name=${display}" \
+        "use=${child_svc}"
+      SERVICES[${child_tpl}:${svc_desc}]="${new_template}"
+    else
+      # Inherited service - just update the reference to latest
+      SERVICES[${child_tpl}:${svc_desc}]="${latest_svc}"
+    fi
+  done
+}
+
 function dump_nagios_object() {
   local type=$1; shift
   local attr value use name
@@ -106,8 +260,10 @@ function dump_nagios_object() {
 
     # save *_name value for diag
     [[ -z $name && ${attr#*_} == "name" ]] && name=${value}
-    # key-transform 'parents' attr
-    # FIXME: do not support multiple parents
+    # Normalize 'parents' attribute (convert special chars to underscore)
+    # Note: multiple parents (comma-separated) are not supported, only the
+    # first parent will be normalized. Nagios supports multiple parents but
+    # nagzen's inheritance model uses single parent per host.
     [[ $attr == "parents" ]] && build_key -v value "$value"
 
     if [[ ${attr} == "use" ]]; then
@@ -134,70 +290,225 @@ function host() {
   local dname=${1%%:*}; shift
   local attrs=( )
 
-  if [[ $CURRENT_HOST ]]; then
+  # Validate host name is not empty
+  [[ -z ${dname} ]] && fatal "empty host name"
+
+  if [[ ${CURRENT_HOST} ]]; then
     host-end
   fi
 
   build_key -v use "${use:+_${use,,}}"
-  build_key -v hostid "$dname"
+  build_key -v hostid "${dname}"
+
+  # Resolve to latest version of template if parent was re-parented
+  [[ ${use} && ${HOST_LATEST[${use}]} ]] && use="${HOST_LATEST[${use}]}"
 
   [[ ${1} == --template ]] && hostid="_${hostid,,}"
 
-  CURRENT_HOST="$hostid"
-  CURRENT_HOST_ADDRESS=
-  HOST_TEMPLATE[$CURRENT_HOST]="$use"
-  HOST_FULLNAME[$CURRENT_HOST]="$dname"
+  CURRENT_HOST="${hostid}"
 
-  if [[ ${HOSTS[$CURRENT_HOST]} == 1 ]]; then
-    fatal "duplicate host ${HOST_FULLNAME[$CURRENT_HOST]}"
+  # For template reopen without parent change: redirect to latest version if exists
+  if [[ ${1} == --template && -z ${use} && ${HOST_LATEST[${CURRENT_HOST}]} ]]; then
+    CURRENT_HOST="${HOST_LATEST[${CURRENT_HOST}]}"
+  fi
+
+  if [[ ${HOSTS[${CURRENT_HOST}]} == 1 ]]; then
+    if [[ ${1} == --template ]]; then
+      # Reopening an existing template - allow it for override by inheritance
+      # But NOT if concrete hosts have already been declared using this template
+      if [[ ${TEMPLATE_HAS_CONCRETE[${CURRENT_HOST}]} ]]; then
+        fatal "cannot reopen template '${dname}': concrete host already declared (${TEMPLATE_HAS_CONCRETE[${CURRENT_HOST}]})"
+      fi
+      IS_HOST_TEMPLATE=1
+      shift
+
+      # Handle parent template on reopen
+      local previous_parent=${HOST_TEMPLATE[${CURRENT_HOST}]}
+      local original_host=${CURRENT_HOST}
+      if [[ -z ${use} ]]; then
+        # No parent specified on reopen - keep existing parent
+        use=${previous_parent}
+      fi
+
+      # If parent changed, create a NEW indexed template instead of modifying
+      if [[ ${use} != "${previous_parent}" ]]; then
+        (( ++HOST_OVERRIDE_COUNT[${original_host}] ))
+        local count=${HOST_OVERRIDE_COUNT[${original_host}]}
+        local new_hostid="${original_host}__${count}"
+
+        # Create the new indexed template
+        CURRENT_HOST="${new_hostid}"
+        HOST_TEMPLATE[${CURRENT_HOST}]="${use}"
+        HOST_FULLNAME[${CURRENT_HOST}]="${dname}"
+        HOST_LOCATION[${CURRENT_HOST}]="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]}"
+        HOSTS[${CURRENT_HOST}]=1
+
+        # Update the "latest" pointer so future references use this version
+        HOST_LATEST[${original_host}]="${new_hostid}"
+
+        # Emit the new host template
+        echo "#### ${new_hostid}:${use} ####"
+        dump_nagios_object host "$@" \
+          "register=0" \
+          "name=${new_hostid}" \
+          "use=${use}"
+        return 0
+      fi
+
+      # Same parent - update inherited service templates to use latest parent references
+      local parent_tpl=${use}
+      local svc
+      if [[ ${parent_tpl} ]]; then
+        for svc in ${HOST_SERVICES[${CURRENT_HOST}]}; do
+          local svc_desc
+          build_key -v svc_desc "${svc,,}"
+          # Use find_service_template with latest=1 to get the latest parent version
+          local parent_svc
+          if find_service_template "${parent_tpl}" "${svc_desc}" 1; then
+            parent_svc="$REPLY"
+          else
+            parent_svc=""
+          fi
+          local current_svc="${SERVICES[${CURRENT_HOST}:${svc_desc}]}"
+          # If parent has a service template and current has its own service template
+          if [[ ${parent_svc} && ${current_svc} ]]; then
+            local current_use="${SERVICE_USE[${CURRENT_HOST}:${svc_desc}]}"
+            # For inherited services, SERVICE_USE is empty, so this triggers.
+            # For explicit services, SERVICE_USE matches parent_svc, so no update.
+            if [[ ${current_use} != "${parent_svc}" ]]; then
+              # Create new intermediate template that uses updated parent
+              (( ++SERVICE_OVERRIDE_COUNT[${CURRENT_HOST}:${svc_desc}] ))
+              local count=${SERVICE_OVERRIDE_COUNT[${CURRENT_HOST}:${svc_desc}]}
+              local new_template="${CURRENT_HOST}:${svc_desc}__${count}"
+              dump_nagios_object service \
+                "register=0" \
+                "name=${new_template}" \
+                "display_name=${svc}" \
+                "use=${parent_svc}"
+              SERVICE_USE[${CURRENT_HOST}:${svc_desc}]="${parent_svc}"
+              SERVICES[${CURRENT_HOST}:${svc_desc}]="${new_template}"
+            fi
+          fi
+        done
+      fi
+
+      # Don't emit host definition again, just set up context for services
+      return 0
+    else
+      fatal "duplicate host '${HOST_FULLNAME[${CURRENT_HOST}]}' (first defined at ${HOST_LOCATION[${CURRENT_HOST}]})"
+    fi
   elif [[ ${1} == --template ]]; then
     IS_HOST_TEMPLATE=1
     attrs=(
       register=0
-      name="$hostid"
-      use="${use:-$DEFAULT_HOST_TEMPLATE}"
+      name="${hostid}"
+      use="${use:-${DEFAULT_HOST_TEMPLATE}}"
     )
     shift
   elif [[ ${1:0:10} == --address= ]]; then
     IS_HOST_TEMPLATE=0
+    # Warn if concrete host name starts with underscore (reserved for templates)
+    [[ ${dname:0:1} == "_" ]] && warning "concrete host '${dname}' starts with underscore (reserved for templates)"
     attrs=(
-      host_name="$hostid"
-      display_name="$dname"
+      host_name="${hostid}"
+      display_name="${dname}"
       address="${1:10}"
-      use="${use:-$DEFAULT_HOST_TEMPLATE}"
+      use="${use:-${DEFAULT_HOST_TEMPLATE}}"
     )
-    CURRENT_HOST_ADDRESS="${1:10}"
     shift
   else
     fatal "bad parameter $1, bypass"
   fi
 
-  HOSTS[$CURRENT_HOST]=1
+  HOST_TEMPLATE[${CURRENT_HOST}]="${use}"
+  HOST_FULLNAME[${CURRENT_HOST}]="${dname}"
+  HOST_LOCATION[${CURRENT_HOST}]="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]}"
+  HOSTS[${CURRENT_HOST}]=1
 
-  echo "#### $hostid${use:+:$use} ####"
+  # For concrete hosts, mark the template chain as used (prevents future reopens)
+  if [[ ${IS_HOST_TEMPLATE} == 0 && ${use} ]]; then
+    mark_template_chain_used "${use}" "'${dname}' at ${HOST_LOCATION[${CURRENT_HOST}]}"
+  fi
+
+  # Resolve =+ attributes against parent host template chain
+  local -a resolved_args=()
+  local field
+  for field in "$@"; do
+    if [[ ${field#*=} == +* ]]; then
+      local attr="${field%%=*}"
+      local add="${field#*=+}"
+      if find_host_attr "${use}" "${attr}"; then
+        field="${attr}=${REPLY},${add}"
+      fi
+    fi
+    resolved_args+=( "$field" )
+  done
+  set -- "${resolved_args[@]}"
+
+  # Track explicit host attributes (resolved) for service =+ resolution
+  for field in "$@"; do
+    HOST_ATTRS[${CURRENT_HOST}:${field%%=*}]="${field#*=}"
+  done
+
+  # Warn if parent template is not defined (may be defined later or external)
+  if [[ ${use} && -z ${HOSTS[${use}]} ]]; then
+    warning "parent template '${use}' not yet defined for host '${dname}'"
+  fi
+
+  # Detect circular inheritance early
+  [[ ${use} ]] && check_circular_inheritance "${CURRENT_HOST}"
+
+  echo "#### ${hostid}${use:+:${use}} ####"
   dump_nagios_object host "$@" "${attrs[@]}"
 }
 
 function host-end() {
-  if [[ $CURRENT_HOST ]]; then
-    if [[ ${HOST_TEMPLATE[$CURRENT_HOST]} ]]; then
-      local use=${HOST_TEMPLATE[$CURRENT_HOST]}
-      local -A services
+  if [[ ${CURRENT_HOST} ]]; then
+    local use=${HOST_TEMPLATE[${CURRENT_HOST}]}
+    local -A services
+    local service
 
-      # load already declared services
-      for service in ${HOST_SERVICES[$CURRENT_HOST]}; do
-        services[$service]=1
+    # load already declared services
+    for service in ${HOST_SERVICES[${CURRENT_HOST}]}; do
+      services[${service}]=1
+    done
+
+    # Collect disabled services from this host and all ancestors
+    for service in ${DISABLED[${CURRENT_HOST}]}; do
+      services[${service}]=1
+    done
+    # Walk the template chain to collect inherited disabled services
+    local tpl=${use}
+    while [[ ${tpl} ]]; do
+      for service in ${DISABLED[${tpl}]}; do
+        services[${service}]=1
       done
+      tpl=${HOST_TEMPLATE[${tpl}]}
+    done
 
-      # mark disabled services
-      for service in ${DISABLED[$CURRENT_HOST]}; do
-        services[$service]=1
-      done
+    # declare others services (only if host has a parent template)
+    if [[ ${use} ]]; then
+      for service in ${HOST_SERVICES[${use}]}; do
+        [[ ${services[${service}]} ]] && continue
+        local desc
+        build_key -v desc "${service,,}"
 
-      # declare others services
-      for service in ${HOST_SERVICES[$use]}; do
-        [[ ${services[$service]} ]] && continue
-        host-service ${service}:${use}:${service}
+        # Find parent service template (latest=1 to get override version if exists)
+        local parent_svc
+        if find_service_template "${use}" "${desc}" 1; then
+          parent_svc="$REPLY"
+        else
+          parent_svc="${SERVICES[${desc}]:-${DEFAULT_SERVICE_TEMPLATE}}"
+        fi
+
+        if [[ ${IS_HOST_TEMPLATE} == 1 ]]; then
+          # Templates: store reference for child templates
+          SERVICES[${CURRENT_HOST}:${desc}]="${parent_svc}"
+          HOST_SERVICES[${CURRENT_HOST}]+="${service}${LIST_SEP}"
+        else
+          # Concrete hosts: emit service with resolved template
+          host-service "${service}:${parent_svc}"
+        fi
       done
     fi
   fi
@@ -213,6 +524,9 @@ function host-service() {
   local dname=${1%%:*}; shift
   local attrs=( )
 
+  # Validate service name is not empty
+  [[ -z ${dname} ]] && fatal "empty service name"
+
   if [[ ${1:0:7} == "--host=" ]]; then
     local CURRENT_HOST
     local IS_HOST_TEMPLATE=0
@@ -227,37 +541,85 @@ function host-service() {
     shift
     attrs=(
       register=0
-      use="${use:-$DEFAULT_SERVICE_TEMPLATE}"
-      name="$desc"
+      use="${use:-${DEFAULT_SERVICE_TEMPLATE}}"
+      name="${desc}"
     )
-    SERVICES[$desc]="$desc"
+    SERVICES[${desc}]="${desc}"
   elif [[ $1 == --disable ]]; then
-    DISABLED[$CURRENT_HOST]+="$dname$IFS"
+    DISABLED[${CURRENT_HOST}]+="${dname}${LIST_SEP}"
     return 0
-  elif [[ $IS_HOST_TEMPLATE == 1 && $CURRENT_HOST ]]; then
-    attrs=(
-      register=0
-      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
-      name="$CURRENT_HOST:$desc"
-      display_name="$dname"
-    )
-    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
-    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
-  elif [[ $IS_HOST_TEMPLATE == 0 && $CURRENT_HOST ]]; then
-    if [[ ${SERVICES[$CURRENT_HOST:$desc]} == 1 ]]; then
-      fatal "duplicate service $dname for host ${HOST_FULLNAME[$CURRENT_HOST]}"
+  elif [[ ${IS_HOST_TEMPLATE} == 1 && ${CURRENT_HOST} ]]; then
+    # For override by inheritance: create intermediate template if service already exists
+    local effective_use
+    local template_name
+    if [[ ${SERVICES[${CURRENT_HOST}:${desc}]} ]]; then
+      # Service already exists - create intermediate template that inherits from previous
+      (( ++SERVICE_OVERRIDE_COUNT[${CURRENT_HOST}:${desc}] ))
+      local count=${SERVICE_OVERRIDE_COUNT[${CURRENT_HOST}:${desc}]}
+      template_name="${CURRENT_HOST}:${desc}__${count}"
+      # Inherit from the previous template (original or previous override)
+      effective_use="${SERVICES[${CURRENT_HOST}:${desc}]}"
+    else
+      # New service - compute 'use=' normally
+      effective_use="${use:-${SERVICES[${desc}]:-${DEFAULT_SERVICE_TEMPLATE}}}"
+      template_name="${CURRENT_HOST}:${desc}"
+      # Only add to HOST_SERVICES for new services (avoid duplicates)
+      HOST_SERVICES[${CURRENT_HOST}]+="${dname}${LIST_SEP}"
     fi
     attrs=(
-      use="${use:-${SERVICES[$desc]:-$DEFAULT_SERVICE_TEMPLATE}}"
-      service_description="${dname//[^A-Za-z0-9:_-]/_}"
-      display_name="$dname"
-      host_name=$CURRENT_HOST
+      register=0
+      use="${effective_use}"
+      name="${template_name}"
+      display_name="${dname}"
     )
-    HOST_SERVICES[$CURRENT_HOST]+="$dname$IFS"
-    SERVICES[$CURRENT_HOST:$desc]="$CURRENT_HOST:$desc"
+    # Store the 'use=' value for potential future overrides
+    SERVICE_USE[${CURRENT_HOST}:${desc}]="${effective_use}"
+    # Always update SERVICES reference (no freeze - reopens propagate to all children)
+    SERVICES[${CURRENT_HOST}:${desc}]="${template_name}"
+    # Propagate updates to all child templates
+    propagate_to_children "${CURRENT_HOST}" "${desc}" "${dname}"
+  elif [[ ${IS_HOST_TEMPLATE} == 0 && ${CURRENT_HOST} ]]; then
+    if [[ -n ${SERVICES[${CURRENT_HOST}:${desc}]} ]]; then
+      fatal "duplicate service ${dname} for host ${HOST_FULLNAME[${CURRENT_HOST}]}"
+    fi
+    # Find service template in hierarchy (latest=0 for explicit service declarations)
+    local effective_use="${use}"
+    if [[ -z ${effective_use} ]]; then
+      if find_service_template "${HOST_TEMPLATE[${CURRENT_HOST}]}" "${desc}" 0; then
+        effective_use="$REPLY"
+      else
+        effective_use="${SERVICES[${desc}]:-${DEFAULT_SERVICE_TEMPLATE}}"
+      fi
+    fi
+    attrs=(
+      use="${effective_use}"
+      service_description="${dname//[^A-Za-z0-9:_-]/_}"
+      display_name="${dname}"
+      host_name=${CURRENT_HOST}
+    )
+    HOST_SERVICES[${CURRENT_HOST}]+="${dname}${LIST_SEP}"
+    SERVICES[${CURRENT_HOST}:${desc}]="${CURRENT_HOST}:${desc}"
   else
     warning "ignore service declaration out of context nor template"
     return 1
+  fi
+
+  # Resolve attr=+X on concrete host services:
+  # walk the host template chain for an explicit attr value and prepend it
+  if [[ ${IS_HOST_TEMPLATE} == 0 && ${CURRENT_HOST} ]]; then
+    local -a resolved_args=()
+    local field
+    for field in "$@"; do
+      if [[ ${field#*=} == +* ]]; then
+        local attr="${field%%=*}"
+        local add="${field#*=+}"
+        if find_host_attr "${CURRENT_HOST}" "${attr}"; then
+          field="${attr}=${REPLY},${add}"
+        fi
+      fi
+      resolved_args+=( "$field" )
+    done
+    set -- "${resolved_args[@]}"
   fi
 
   dump_nagios_object service "$@" "${attrs[@]}"
@@ -270,6 +632,9 @@ function service() {
 declare DEFAULT_HOST_TEMPLATE=generic-host
 declare DEFAULT_SERVICE_TEMPLATE=generic-service
 
+# Explicit separator for list values (space) - do not change
+declare -r LIST_SEP=' '
+
 declare VERBOSE=${VERBOSE:-1}
 declare XDEBUG=${XDEBUG:-0}
 
@@ -278,13 +643,25 @@ declare -A C=([notice]="" [info]="" [error]="" [warning]="" [fatal]="" [debug]="
 declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
+# SERVICE_USE tracks the 'use=' value for EXPLICITLY declared services only.
+# Inherited services (from host-end) do NOT have SERVICE_USE set.
+# This asymmetry is used by the reopen logic to detect inherited services
+# that need updating when the template is reopened.
+declare -A SERVICE_USE=( )
+declare -A SERVICE_OVERRIDE_COUNT=( )  # Tracks override count for intermediate templates
 declare -A DISABLED=( )
 declare -A HOST_SERVICES=( )
 declare -A HOST_TEMPLATE=( )
+declare -A HOST_LOCATION=( )  # Stores file:line of first host definition
 declare -A HOST_FULLNAME=( )
+declare -A HOST_ATTRS=( )
+declare -A HOST_OVERRIDE_COUNT=( )  # Tracks host template versions when parent changes
+declare -A HOST_LATEST=( )  # Points to the latest version of a host template
+# TEMPLATE_HAS_CONCRETE tracks which templates have concrete hosts declared.
+# Value is "hostname at file:line" of the first concrete host.
+# Used to prevent reopening a template after concrete hosts exist.
+declare -A TEMPLATE_HAS_CONCRETE=( )
 declare IS_HOST_TEMPLATE
-
-# set
 
 (( ${#BASH_SOURCE[@]} > 1 )) && return
 
