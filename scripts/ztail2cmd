@@ -1,0 +1,234 @@
+#!/bin/bash
+#
+# ztail2cmd - Tail a file with resume capability, piping to a command
+#
+# Usage: ztail2cmd [-s STATE_FILE] [-f] [-i INTERVAL] FILE -- COMMAND [ARGS...]
+#
+# Options:
+#   -s STATE_FILE   Custom state file path (default: FILE.SUFFIX)
+#   -f, --follow    Follow mode: loop and watch for new data
+#   -i INTERVAL     Poll interval in seconds for follow mode (default: 1)
+#
+# Tracks file position and inode to handle:
+# - Resume from last position after restart
+# - Log rotation (inode change or file truncation)
+# - Creates a hardlink to preserve access to rotated file
+#
+# State file format (3 lines):
+#   inode
+#   offset
+#   hardlink_path (optional)
+#
+# Environment variables:
+#   ZTAIL_SUFFIX    State file suffix (default: ztail)
+#
+
+set -e
+
+ZTAIL_SUFFIX=${ZTAIL_SUFFIX:-ztail}
+
+usage() {
+    echo "Usage: $0 [-s STATE_FILE] [-f] [-i INTERVAL] FILE -- COMMAND [ARGS...]" >&2
+    echo "  -s STATE_FILE   Custom state file path" >&2
+    echo "  -f, --follow    Follow mode (loop)" >&2
+    echo "  -i INTERVAL     Poll interval in seconds (default: 1)" >&2
+    exit 1
+}
+
+STATE_FILE=""
+FOLLOW=0
+INTERVAL=1
+
+# Parse options (handle both short and long)
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -s)
+            STATE_FILE=$2
+            shift 2
+            ;;
+        -f|--follow)
+            FOLLOW=1
+            shift
+            ;;
+        -i)
+            INTERVAL=$2
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            usage
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+# Find FILE and -- separator
+FILE=""
+CMD=()
+found_sep=0
+for arg in "$@"; do
+    if [[ $found_sep -eq 1 ]]; then
+        CMD+=("$arg")
+    elif [[ $arg == "--" ]]; then
+        found_sep=1
+    elif [[ -z $FILE ]]; then
+        FILE=$arg
+    else
+        usage
+    fi
+done
+
+[[ -n $FILE ]] || usage
+[[ ${#CMD[@]} -gt 0 ]] || usage
+
+# Default state file next to the target file
+if [[ -z $STATE_FILE ]]; then
+    STATE_FILE="${FILE}.${ZTAIL_SUFFIX}"
+fi
+
+STATE_DIR=$(dirname "$STATE_FILE")
+HARDLINK_DIR=$STATE_DIR
+
+# Read state file if exists
+read_state() {
+    if [[ -f $STATE_FILE ]]; then
+        { read -r SAVED_INODE; read -r SAVED_OFFSET; read -r SAVED_HARDLINK; } < "$STATE_FILE"
+        SAVED_INODE=${SAVED_INODE:-0}
+        SAVED_OFFSET=${SAVED_OFFSET:-0}
+    else
+        SAVED_INODE=0
+        SAVED_OFFSET=0
+        SAVED_HARDLINK=""
+    fi
+}
+
+# Write state file
+write_state() {
+    local inode=$1 offset=$2 hardlink=${3:-}
+    printf '%s\n%s\n%s\n' "$inode" "$offset" "$hardlink" > "$STATE_FILE"
+}
+
+# Get file inode
+get_inode() {
+    stat -c %i "$1" 2>/dev/null || echo 0
+}
+
+# Get file size
+get_size() {
+    stat -c %s "$1" 2>/dev/null || echo 0
+}
+
+# Create hardlink for rotation safety
+create_hardlink() {
+    local src=$1
+    local link="${HARDLINK_DIR}/.ztail_$$_$(basename "$src")"
+    if ln "$src" "$link" 2>/dev/null; then
+        echo "$link"
+    fi
+}
+
+# Remove old hardlink
+remove_hardlink() {
+    local link=$1
+    [[ -n $link && -f $link ]] && rm -f "$link"
+    return 0
+}
+
+# Process file from offset, pipe to command
+process_file() {
+    local file=$1
+    local offset=$2
+
+    tail -c +"$((offset + 1))" "$file" | "${CMD[@]}"
+}
+
+# Process one iteration: read new data, handle rotation, update state
+process_iteration() {
+    read_state
+
+    if [[ ! -f $FILE ]]; then
+        # In follow mode, wait for file to appear
+        if [[ $FOLLOW -eq 1 ]]; then
+            return 0
+        fi
+        echo "[ztail] File not found: $FILE" >&2
+        exit 1
+    fi
+
+    local current_inode=$(get_inode "$FILE")
+    local current_size=$(get_size "$FILE")
+
+    # Detect rotation
+    if [[ $SAVED_INODE -ne 0 && $SAVED_INODE -ne $current_inode ]]; then
+        # Inode changed - file was rotated/replaced
+        echo "[ztail] Rotation detected (inode changed: $SAVED_INODE -> $current_inode)" >&2
+
+        # Finish reading old file via hardlink if available
+        if [[ -n $SAVED_HARDLINK && -f $SAVED_HARDLINK ]]; then
+            echo "[ztail] Finishing old file via hardlink" >&2
+            process_file "$SAVED_HARDLINK" "$SAVED_OFFSET" >/dev/null
+            remove_hardlink "$SAVED_HARDLINK"
+        fi
+
+        # Start fresh on new file
+        SAVED_OFFSET=0
+        SAVED_HARDLINK=""
+
+    elif [[ $SAVED_OFFSET -gt $current_size ]]; then
+        # File was truncated (copytruncate rotation)
+        echo "[ztail] Rotation detected (file truncated: $SAVED_OFFSET > $current_size)" >&2
+        SAVED_OFFSET=0
+        remove_hardlink "$SAVED_HARDLINK"
+        SAVED_HARDLINK=""
+    fi
+
+    # Skip if no new data
+    if [[ $SAVED_OFFSET -ge $current_size ]]; then
+        # Persist new inode after rotation to empty file
+        if [[ $SAVED_INODE -ne $current_inode ]]; then
+            write_state "$current_inode" "$current_size" ""
+        fi
+        return 0
+    fi
+
+    # Create/update hardlink for current file
+    remove_hardlink "$SAVED_HARDLINK"
+    local hardlink=$(create_hardlink "$FILE")
+
+    # Process new data
+    process_file "$FILE" "$SAVED_OFFSET"
+
+    # Save state with new size
+    local new_size=$(get_size "$FILE")
+    write_state "$current_inode" "$new_size" "$hardlink"
+}
+
+# Open a pipe that blocks forever (no writer, no EOF thanks to read-write mode)
+exec {WAIT_FD}<> <(:)
+
+# Wait for file change using inotifywait (event-driven, no polling)
+wait_for_change() {
+    read -t "$INTERVAL" dummy <&$WAIT_FD || true
+    # if [[ -f $FILE ]]; then
+    #     inotifywait -qq -t "$INTERVAL" -e modify "$FILE" 2>/dev/null || true
+    # else
+    #     inotifywait -qq -t "$INTERVAL" -e create "$(dirname "$FILE")" 2>/dev/null || true
+    # fi
+}
+
+# Main logic
+if [[ $FOLLOW -eq 1 ]]; then
+    # Follow mode: loop forever
+    while true; do
+        process_iteration
+        wait_for_change
+    done
+else
+    # Single run mode
+    process_iteration
+fi
