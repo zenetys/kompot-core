@@ -16,9 +16,8 @@ set -f
 PROGNAME=${0##*/}
 USAGE="${PROGNAME} [OPTIONS] {-f FILENAME|ACTION ...}"
 
-function info() {
-    local i;
-    local d=$(date +%Y-%m-%dT%H:%M:%S.%3N%z);
+function log() {
+    local i
     local l=info
     [[ ${1:0:2} == -- ]] && l=${1:2} && shift
     for i in "$@"; do
@@ -26,29 +25,38 @@ function info() {
     done
 }
 
+function notice() {
+    log --${FUNCNAME[0]} "$@"
+}
+
+function info() {
+    (( VERBOSE < 1 )) && return 0
+    log --${FUNCNAME[0]} "$@"
+}
+
 function fatal() {
     local usage=0
     [[ $1 == --usage ]] && usage=1 && shift
-    info --${FUNCNAME[0]} "$@"
+    log --${FUNCNAME[0]} "$@"
     (( $usage )) && usage
     trap "" EXIT
     exit 127
 }
 
 function error() {
-    info --${FUNCNAME[0]} "$@"
+    log --${FUNCNAME[0]} "$@"
 }
 
 function warning() {
-    info --${FUNCNAME[0]} "$@"
+    log --${FUNCNAME[0]} "$@"
 }
 
 function debug() {
-    local debug=0
+    local level=2
 
-    [[ ${1:0:1} == - ]] && debug=${1:1} && shift
-    (( DEBUG < $debug )) && return 0
-    info --${FUNCNAME[0]} "$@"
+    [[ ${1:0:1} == - ]] && level=${1:1} && shift
+    (( VERBOSE < level )) && return 0
+    log --${FUNCNAME[0]} "$@"
 }
 
 function usage() {
@@ -120,7 +128,7 @@ function dump_nagios_object() {
     fi
   done
   for attr in "${already[@]}"; do
-    debug -2 "'$attr' for $type '$name' multiple definition, keep first"
+    debug "'$attr' for $type '$name' multiple definition, keep first"
   done
   if [[ $use ]]; then
     printf "  %-20s %s\n" "use" "$use"
@@ -132,9 +140,8 @@ function dump_nagios_object() {
 function addHost() {
   fatal not-implemented
 }
-
 function host() {
-  debug -5 "$FUNCNAME $*"
+  debug -3 "$FUNCNAME $*"
   local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
@@ -213,7 +220,7 @@ function host-end() {
 }
 
 function host-service() {
-  debug -5 "$FUNCNAME $*"
+  debug -3 "$FUNCNAME $*"
   local use=${1#*:} && [[ $use = $1 ]] && unset use
   local dname=${1%%:*}; shift
   local attrs=( )
@@ -277,6 +284,9 @@ declare DEFAULT_SERVICE_TEMPLATE=generic-service
 
 declare VERBOSE=${VERBOSE:-1}
 declare XDEBUG=${XDEBUG:-0}
+
+# Color codes for log messages (empty by default, can be set externally)
+declare -A C=([notice]="" [info]="" [error]="" [warning]="" [fatal]="" [debug]="" [reset]="")
 declare -a ARGS=( )
 declare -A HOSTS=( )
 declare -A SERVICES=( )
