@@ -1,0 +1,49 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+
+#### _monitored:_linux ####
+define host {
+  register             0
+  name                 _monitored
+  use                  _linux
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _monitored:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  __WARNING            75
+  __CRITICAL           90
+  register             0
+  name                 _monitored:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+#### myserver:_monitored ####
+define host {
+  host_name            myserver
+  display_name         myserver
+  address              10.0.0.1
+  use                  _monitored
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver
+  use                  _monitored:adm-ssh
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            myserver
+  use                  _monitored:cpu
+}
+

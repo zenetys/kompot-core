@@ -1,0 +1,39 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _linux:mem
+  display_name         MEM
+  use                  generic-service
+}
+
+#### linux:_linux ####
+define host {
+  host_name            linux
+  display_name         linux
+  address              192.168.1.1
+  use                  _linux
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            linux
+  use                  _linux:cpu
+}
+define service {
+  service_description  MEM
+  display_name         MEM
+  host_name            linux
+  use                  _linux:mem
+}
+

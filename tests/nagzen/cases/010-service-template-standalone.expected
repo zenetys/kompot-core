@@ -1,0 +1,42 @@
+define service {
+  check_command        check-dummy
+  __WARNING            80
+  __CRITICAL           95
+  register             0
+  name                 my-custom-check
+  use                  generic-service
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+
+#### _myhost:_linux ####
+define host {
+  register             0
+  name                 _myhost
+  use                  _linux
+}
+define service {
+  register             0
+  name                 _myhost:custom
+  display_name         CUSTOM
+  use                  my-custom-check
+}
+
+#### server1:_myhost ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _myhost
+}
+define service {
+  service_description  CUSTOM
+  display_name         CUSTOM
+  host_name            server1
+  use                  _myhost:custom
+}
+

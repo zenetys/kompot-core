@@ -1,0 +1,53 @@
+#### _snmp ####
+define host {
+  register             0
+  name                 _snmp
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _snmp:hostname
+  display_name         HOSTNAME
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _snmp:uptime
+  display_name         UPTIME
+  use                  generic-service
+}
+
+#### _linux:_snmp ####
+define host {
+  register             0
+  name                 _linux
+  use                  _snmp
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+
+#### myserver:_linux ####
+define host {
+  host_name            myserver
+  display_name         myserver
+  address              10.0.0.1
+  use                  _linux
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            myserver
+  use                  _linux:cpu
+}
+define service {
+  service_description  UPTIME
+  display_name         UPTIME
+  host_name            myserver
+  use                  _snmp:uptime
+}
+

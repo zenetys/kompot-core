@@ -1,0 +1,101 @@
+define service {
+  __PORT               22
+  register             0
+  name                 adm-ssh
+  use                  generic-service
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  adm-ssh
+}
+
+#### _debian:_linux ####
+define host {
+  register             0
+  name                 _debian
+  use                  _linux
+}
+define service {
+  register             0
+  name                 _debian:adm-ssh
+  display_name         ADM-SSH
+  use                  adm-ssh
+}
+
+define service {
+  register             0
+  name                 _debian:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _debian:adm-ssh
+}
+define service {
+  __PORT               2244
+  register             0
+  name                 _linux:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh
+}
+
+define service {
+  register             0
+  name                 _debian:adm-ssh__2
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh__1
+}
+
+#### debian1:_debian ####
+define host {
+  host_name            debian1
+  display_name         debian1
+  address              127.0.0.3
+  use                  _debian
+}
+define service {
+  service_description  DUMMY
+  display_name         DUMMY
+  host_name            debian1
+  use                  generic-service
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            debian1
+  use                  _debian:adm-ssh__2
+}
+
+#### supi1:_debian ####
+define host {
+  host_name            supi1
+  display_name         supi1
+  address              127.0.0.1
+  use                  _debian
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            supi1
+  use                  _debian:adm-ssh__2
+}
+
+#### supi2:_linux ####
+define host {
+  host_name            supi2
+  display_name         supi2
+  address              127.0.0.2
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            supi2
+  use                  _linux:adm-ssh__1
+}
+

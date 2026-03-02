@@ -1,0 +1,70 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### _debian:_linux ####
+define host {
+  register             0
+  name                 _debian
+  use                  _linux
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _debian:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+define service {
+  register             0
+  name                 _debian:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _debian:adm-ssh
+}
+define service {
+  __PORT               4444
+  register             0
+  name                 _linux:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh
+}
+
+#### server1:_debian ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _debian
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server1
+  use                  _debian:adm-ssh__1
+}
+
+#### server2:_linux ####
+define host {
+  host_name            server2
+  display_name         server2
+  address              10.0.0.2
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server2
+  use                  _linux:adm-ssh__1
+}
+

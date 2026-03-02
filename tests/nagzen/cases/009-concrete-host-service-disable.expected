@@ -1,0 +1,46 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _linux:mem
+  display_name         MEM
+  use                  generic-service
+}
+
+#### myserver:_linux ####
+define host {
+  host_name            myserver
+  display_name         myserver
+  address              192.168.1.100
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            myserver
+  use                  _linux:adm-ssh
+}
+define service {
+  service_description  MEM
+  display_name         MEM
+  host_name            myserver
+  use                  _linux:mem
+}
+

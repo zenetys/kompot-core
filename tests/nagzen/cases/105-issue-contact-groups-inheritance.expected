@@ -1,0 +1,155 @@
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  __WARNING            300
+  __CRITICAL           330
+  register             0
+  name                 _linux:nb-process
+  display_name         NB-PROCESS
+  use                  generic-service
+}
+
+#### testhost1:_linux ####
+define host {
+  contact_groups       admins
+  host_name            testhost1
+  display_name         testhost1
+  address              192.168.1.1
+  use                  _linux
+}
+define service {
+  __WARNING            111
+  contact_groups       admins,grp_test
+  service_description  NB-PROCESS
+  display_name         NB-PROCESS
+  host_name            testhost1
+  use                  _linux:nb-process
+}
+
+#### _infra ####
+define host {
+  contact_groups       ops
+  register             0
+  name                 _infra
+  use                  generic-host
+}
+define service {
+  __WARNING            80
+  __CRITICAL           90
+  register             0
+  name                 _infra:disk
+  display_name         DISK
+  use                  generic-service
+}
+
+#### testhost2:_infra ####
+define host {
+  host_name            testhost2
+  display_name         testhost2
+  address              192.168.1.2
+  use                  _infra
+}
+define service {
+  contact_groups       ops,grp_test
+  service_description  DISK
+  display_name         DISK
+  host_name            testhost2
+  use                  _infra:disk
+}
+
+#### _bare ####
+define host {
+  register             0
+  name                 _bare
+  use                  generic-host
+}
+define service {
+  __WARNING            80
+  __CRITICAL           90
+  register             0
+  name                 _bare:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+#### testhost3:_bare ####
+define host {
+  host_name            testhost3
+  display_name         testhost3
+  address              192.168.1.3
+  use                  _bare
+}
+define service {
+  contact_groups       +grp_test
+  service_description  CPU
+  display_name         CPU
+  host_name            testhost3
+  use                  _bare:cpu
+}
+
+#### testhost4:_linux ####
+define host {
+  host_name            testhost4
+  display_name         testhost4
+  address              192.168.1.4
+  use                  _linux
+}
+define service {
+  __WARNING            222
+  service_description  NB-PROCESS
+  display_name         NB-PROCESS
+  host_name            testhost4
+  use                  _linux:nb-process
+}
+
+#### testhost5:_linux ####
+define host {
+  host_name            testhost5
+  display_name         testhost5
+  address              192.168.1.5
+  use                  _linux
+}
+define service {
+  __WARNING            333
+  contact_groups       only_this
+  service_description  NB-PROCESS
+  display_name         NB-PROCESS
+  host_name            testhost5
+  use                  _linux:nb-process
+}
+
+#### _base6 ####
+define host {
+  contact_groups       default
+  register             0
+  name                 _base6
+  use                  generic-host
+}
+define service {
+  __WARNING            50
+  register             0
+  name                 _base6:sql
+  display_name         SQL
+  use                  generic-service
+}
+
+#### testhost6:_base6 ####
+define host {
+  contact_groups       default,sms
+  host_name            testhost6
+  display_name         testhost6
+  address              192.168.1.6
+  use                  _base6
+}
+define service {
+  contact_groups       default,sms,phone
+  service_description  SQL
+  display_name         SQL
+  host_name            testhost6
+  use                  _base6:sql
+}
+

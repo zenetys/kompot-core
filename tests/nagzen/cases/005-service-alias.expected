@@ -1,0 +1,59 @@
+define service {
+  check_command        check-dummy
+  register             0
+  name                 snmp-linux-cpu
+  use                  generic-service
+}
+define service {
+  check_command        check-dummy
+  register             0
+  name                 snmp-linux-mem
+  use                  generic-service
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+
+#### _myhost:_linux ####
+define host {
+  register             0
+  name                 _myhost
+  use                  _linux
+}
+define service {
+  register             0
+  name                 _myhost:my-cpu
+  display_name         MY-CPU
+  use                  snmp-linux-cpu
+}
+define service {
+  __WARNING            80
+  register             0
+  name                 _myhost:my-mem
+  display_name         MY-MEM
+  use                  snmp-linux-mem
+}
+
+#### server1:_myhost ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _myhost
+}
+define service {
+  service_description  MY-CPU
+  display_name         MY-CPU
+  host_name            server1
+  use                  _myhost:my-cpu
+}
+define service {
+  service_description  MY-MEM
+  display_name         MY-MEM
+  host_name            server1
+  use                  _myhost:my-mem
+}
+

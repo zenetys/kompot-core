@@ -1,0 +1,7 @@
+#### _mytemplate ####
+define host {
+  register             0
+  name                 _mytemplate
+  use                  generic-host
+}
+

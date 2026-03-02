@@ -1,0 +1,92 @@
+#### _base ####
+define host {
+  register             0
+  name                 _base
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _base:base-svc
+  display_name         BASE-SVC
+  use                  generic-service
+}
+
+#### _other ####
+define host {
+  register             0
+  name                 _other
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _other:other-svc
+  display_name         OTHER-SVC
+  use                  generic-service
+}
+
+#### _linux:_base ####
+define host {
+  register             0
+  name                 _linux
+  use                  _base
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+#### _linux__1:_other ####
+define host {
+  register             0
+  name                 _linux__1
+  use                  _other
+}
+define service {
+  register             0
+  name                 _linux__1:mem
+  display_name         MEM
+  use                  generic-service
+}
+
+define service {
+  register             0
+  name                 _linux__1:other-svc__1
+  display_name         OTHER-SVC
+  use                  _other:other-svc
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _linux__1:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### server1:_linux__1 ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _linux__1
+}
+define service {
+  service_description  MEM
+  display_name         MEM
+  host_name            server1
+  use                  _linux__1:mem
+}
+define service {
+  service_description  OTHER-SVC
+  display_name         OTHER-SVC
+  host_name            server1
+  use                  _linux__1:other-svc__1
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server1
+  use                  _linux__1:adm-ssh
+}
+

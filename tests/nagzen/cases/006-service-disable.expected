@@ -1,0 +1,32 @@
+#### _base:_linux ####
+define host {
+  register             0
+  name                 _base
+  use                  _linux
+}
+define service {
+  register             0
+  name                 _base:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _base:cpu
+  display_name         CPU
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _base:mem
+  display_name         MEM
+  use                  generic-service
+}
+
+#### _derived:_base ####
+define host {
+  register             0
+  name                 _derived
+  use                  _base
+}
+

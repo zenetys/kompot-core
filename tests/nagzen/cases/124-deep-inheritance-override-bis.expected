@@ -1,0 +1,92 @@
+define service {
+  __PORT               22
+  register             0
+  name                 adm-ssh
+  use                  generic-service
+}
+#### _ping ####
+define host {
+  register             0
+  name                 _ping
+  use                  generic-host
+}
+
+#### _snmp:_ping ####
+define host {
+  register             0
+  name                 _snmp
+  use                  _ping
+}
+
+#### _os:_snmp ####
+define host {
+  register             0
+  name                 _os
+  use                  _snmp
+}
+
+#### _linux:_os ####
+define host {
+  register             0
+  name                 _linux
+  use                  _os
+}
+define service {
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  adm-ssh
+}
+
+#### _debian:_linux ####
+define host {
+  register             0
+  name                 _debian
+  use                  _linux
+}
+
+define service {
+  __PORT               2244
+  register             0
+  name                 _linux:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh
+}
+
+define service {
+  register             0
+  name                 _debian:adm-ssh__1
+  display_name         ADM-SSH
+  use                  _linux:adm-ssh__1
+}
+
+#### supi1:_debian ####
+define host {
+  __TAGS               tag1
+  host_name            supi1
+  display_name         supi1
+  address              127.0.0.2
+  use                  _debian
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            supi1
+  use                  _debian:adm-ssh__1
+}
+
+#### supi2:_linux ####
+define host {
+  __TAGS               tag2
+  host_name            supi2
+  display_name         supi2
+  address              127.0.0.3
+  use                  _linux
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            supi2
+  use                  _linux:adm-ssh__1
+}
+

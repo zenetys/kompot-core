@@ -1,0 +1,60 @@
+#### _base ####
+define host {
+  register             0
+  name                 _base
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _base:base-svc
+  display_name         BASE-SVC
+  use                  generic-service
+}
+
+#### _linux:_base ####
+define host {
+  register             0
+  name                 _linux
+  use                  _base
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+
+define service {
+  __PORT               4444
+  register             0
+  name                 _base:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+
+#### server1:_linux ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _linux
+}
+define service {
+  service_description  CPU
+  display_name         CPU
+  host_name            server1
+  use                  _linux:cpu
+}
+define service {
+  service_description  BASE-SVC
+  display_name         BASE-SVC
+  host_name            server1
+  use                  _base:base-svc
+}
+define service {
+  service_description  ADM-SSH
+  display_name         ADM-SSH
+  host_name            server1
+  use                  _base:adm-ssh
+}
+
