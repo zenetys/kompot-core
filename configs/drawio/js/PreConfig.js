@@ -13,6 +13,7 @@ window.DRAW_MATH_URL = 'math/es5';
 window.DRAWIO_CONFIG = null; // Replace with your custom draw.io configurations. For more details, https://www.drawio.com/doc/faq/configure-diagram-editor
 
 window.ALLOW_CUSTOM_PLUGINS = true;
+window.KOMPOT_SHOW_SOFT = false;
 
 window.mxLanguageMap = {
     i18n: '',
@@ -54,6 +55,7 @@ function cState(d) {
   const ORANGE = "#F57C00";
   const RED = "#E53935";
   const GREY = "#A0A0A0";
+  const LIGHT_GREY = "#D0D0D0";
   const BLUE = "#80D8FF";
   const st = {
     0:GREY,
@@ -69,7 +71,17 @@ function cState(d) {
   };
   if (typeof(d) === "undefined")
     return GREY;
+  if (d.state_type === 0) {
+    if (!window.KOMPOT_SHOW_SOFT)
+      return GREY;
+    return LIGHT_GREY;
+  }
   return (st[d.state]);
+}
+
+function toggleSoft() {
+  window.KOMPOT_SHOW_SOFT = !window.KOMPOT_SHOW_SOFT;
+  return window.KOMPOT_SHOW_SOFT;
 }
 
 function cName(d) {
