@@ -1,0 +1,259 @@
+#!/bin/bash
+#
+# availability-calc - Calculate availability using SQL
+#
+# Input format (tab-separated), two modes:
+#
+#   Mode 1 - Single entity (2 columns):
+#     timestamp state
+#
+#   Mode 2 - Host+Service (3 columns):
+#     timestamp host_state service_state
+#
+# Output format (tab-separated):
+#   available unavailable unknown availability%
+#
+# Variables (passed via -v):
+#   SINCE  - Start of period (unix timestamp, required)
+#   BEFORE - End of period (unix timestamp, required)
+#
+
+set -euo pipefail
+
+# Parse -v arguments (awk-style)
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -v)
+      # Handle VAR=value format, preserving spaces in value
+      varname="${2%%=*}"
+      varvalue="${2#*=}"
+      declare "$varname=$varvalue"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+[[ -v SINCE ]] || { echo "Missing SINCE variable" >&2; exit 1; }
+[[ -v BEFORE ]] || { echo "Missing BEFORE variable" >&2; exit 1; }
+
+# Convert SINCE/BEFORE to both Unix and ISO format
+# Handle both Unix timestamps and ISO format input
+if [[ $SINCE =~ ^[0-9]+$ ]]; then
+  SINCE_UNIX=$SINCE
+  SINCE_ISO=$(date -u -d "@$SINCE" '+%Y-%m-%d %H:%M:%S')
+else
+  SINCE_ISO="$SINCE"
+  SINCE_UNIX=$(date -u -d "$SINCE" '+%s')
+fi
+
+if [[ $BEFORE =~ ^[0-9]+$ ]]; then
+  BEFORE_UNIX=$BEFORE
+  BEFORE_ISO=$(date -u -d "@$BEFORE" '+%Y-%m-%d %H:%M:%S')
+else
+  BEFORE_ISO="$BEFORE"
+  BEFORE_UNIX=$(date -u -d "$BEFORE" '+%s')
+fi
+
+PERIOD_DURATION=$((BEFORE_UNIX - SINCE_UNIX))
+
+# Create temporary database
+TMPDB=$(mktemp --suffix=.db)
+trap "rm -f $TMPDB" EXIT
+
+# Initialize database
+sqlite3 "$TMPDB" << 'EOSQL'
+CREATE TABLE state (
+  hostname TEXT NOT NULL,
+  service TEXT,
+  timestamp TEXT NOT NULL,
+  state TEXT NOT NULL
+);
+CREATE INDEX idx_state_lookup ON state(hostname, service, timestamp);
+EOSQL
+
+# Read input and detect mode (2 or 3 columns)
+INPUT=$(cat)
+if [[ -z "$INPUT" ]]; then
+  # No data - entire period is unknown
+  echo -e "0\t0\t${PERIOD_DURATION}\t100.0000"
+  exit 0
+fi
+
+# Detect mode from first line
+FIRST_LINE=$(echo "$INPUT" | head -1)
+NUM_COLS=$(echo "$FIRST_LINE" | awk -F'\t' '{print NF}')
+
+# Convert timestamps to ISO format and insert into database
+if [[ $NUM_COLS -eq 2 ]]; then
+  # Mode 1: timestamp state -> treat as host (service IS NULL)
+  echo "$INPUT" | while IFS=$'\t' read -r ts state; do
+    # Convert unix timestamp to ISO if numeric
+    if [[ $ts =~ ^[0-9]+$ ]]; then
+      ts=$(date -u -d "@$ts" '+%Y-%m-%d %H:%M:%S')
+    fi
+    echo "INSERT INTO state VALUES ('_host', NULL, '$ts', '$state');"
+  done | sqlite3 "$TMPDB"
+
+  HOSTNAME="_host"
+  SERVICE_FILTER="AND service IS NULL"
+  MODE="host"
+else
+  # Mode 2: timestamp host_state service_state
+  echo "$INPUT" | while IFS=$'\t' read -r ts host_state svc_state; do
+    if [[ $ts =~ ^[0-9]+$ ]]; then
+      ts=$(date -u -d "@$ts" '+%Y-%m-%d %H:%M:%S')
+    fi
+    # Insert host state
+    echo "INSERT INTO state VALUES ('_host', NULL, '$ts', '$host_state');"
+    # Insert service state
+    echo "INSERT INTO state VALUES ('_host', '_service', '$ts', '$svc_state');"
+  done | sqlite3 "$TMPDB"
+
+  HOSTNAME="_host"
+  SERVICE_FILTER="AND service = '_service'"
+  MODE="service"
+fi
+
+# SQL for host-only mode (no correlation needed)
+if [[ $MODE == "host" ]]; then
+  SQL=$(cat << EOSQL
+WITH
+initial_state AS (
+  SELECT state, timestamp,
+         ROW_NUMBER() OVER (ORDER BY timestamp DESC) as rn
+  FROM state
+  WHERE hostname = '$HOSTNAME' $SERVICE_FILTER
+    AND timestamp < '$SINCE_ISO'
+    AND state IN ('UP', 'DOWN', 'UNREACHABLE', 'OK', 'WARNING', 'CRITICAL', 'UNKNOWN')
+),
+period_states AS (
+  SELECT state, timestamp
+  FROM state
+  WHERE hostname = '$HOSTNAME' $SERVICE_FILTER
+    AND timestamp >= '$SINCE_ISO'
+    AND timestamp < '$BEFORE_ISO'
+),
+-- Get initial state or UNKNOWN if none exists
+initial_or_unknown AS (
+  SELECT COALESCE(
+    (SELECT state FROM initial_state WHERE rn = 1),
+    'UNKNOWN'
+  ) as state
+),
+all_states AS (
+  -- Always start with period start timestamp
+  SELECT state, '$SINCE_ISO' as timestamp FROM initial_or_unknown
+  UNION ALL
+  SELECT state, timestamp FROM period_states
+),
+state_durations AS (
+  SELECT state, timestamp as start_ts,
+    COALESCE(LEAD(timestamp) OVER (ORDER BY timestamp), '$BEFORE_ISO') as end_ts
+  FROM all_states
+),
+aggregated AS (
+  SELECT
+    ROUND(SUM(CASE WHEN state IN ('OK', 'WARNING', 'UP') THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END)) as available,
+    ROUND(SUM(CASE WHEN state IN ('CRITICAL', 'DOWN') THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END)) as unavailable,
+    ROUND(SUM(CASE WHEN state NOT IN ('OK', 'WARNING', 'UP', 'CRITICAL', 'DOWN') THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END)) as unknown
+  FROM state_durations
+)
+SELECT
+  CAST(available AS INTEGER),
+  CAST(unavailable AS INTEGER),
+  CAST(unknown AS INTEGER),
+  CASE
+    WHEN available + unavailable > 0
+    THEN ROUND(available * 100.0 / (available + unavailable), 4)
+    ELSE 100.0
+  END as availability
+FROM aggregated;
+EOSQL
+)
+else
+  # SQL for service mode (with host correlation)
+  SQL=$(cat << EOSQL
+WITH
+-- Get all event timestamps (host and service changes)
+events AS (
+  SELECT timestamp FROM state
+  WHERE hostname = '$HOSTNAME' AND service IS NULL
+    AND timestamp >= '$SINCE_ISO' AND timestamp < '$BEFORE_ISO'
+    AND state IN ('UP', 'DOWN', 'UNREACHABLE')
+  UNION
+  SELECT timestamp FROM state
+  WHERE hostname = '$HOSTNAME' AND service = '_service'
+    AND timestamp >= '$SINCE_ISO' AND timestamp < '$BEFORE_ISO'
+    AND state NOT IN ('FLAPPING_STARTED', 'FLAPPING_STOPPED')
+  UNION
+  SELECT '$SINCE_ISO'
+),
+-- At each event, get current host and service state
+states_at_events AS (
+  SELECT
+    e.timestamp,
+    (SELECT state FROM state
+     WHERE hostname = '$HOSTNAME' AND service = '_service' AND timestamp <= e.timestamp
+       AND state NOT IN ('FLAPPING_STARTED', 'FLAPPING_STOPPED')
+     ORDER BY timestamp DESC LIMIT 1) as service_state,
+    (SELECT state FROM state
+     WHERE hostname = '$HOSTNAME' AND service IS NULL AND timestamp <= e.timestamp
+       AND state IN ('UP', 'DOWN', 'UNREACHABLE')
+     ORDER BY timestamp DESC LIMIT 1) as host_state
+  FROM events e
+),
+-- Add end timestamp
+with_end AS (
+  SELECT timestamp, service_state, host_state,
+    COALESCE(LEAD(timestamp) OVER (ORDER BY timestamp), '$BEFORE_ISO') as end_ts
+  FROM states_at_events
+),
+-- Calculate effective state and duration
+effective AS (
+  SELECT
+    (julianday(end_ts) - julianday(timestamp)) * 86400 as duration,
+    CASE
+      WHEN host_state IN ('DOWN', 'UNREACHABLE') THEN 'unknown'
+      WHEN service_state = 'UNKNOWN' THEN 'unknown'
+      WHEN service_state IN ('OK', 'WARNING') THEN 'available'
+      WHEN service_state = 'CRITICAL' THEN 'unavailable'
+      ELSE 'unknown'
+    END as effective_state
+  FROM with_end
+  WHERE timestamp < '$BEFORE_ISO'
+),
+aggregated AS (
+  SELECT
+    ROUND(SUM(CASE WHEN effective_state = 'available' THEN duration ELSE 0 END)) as available,
+    ROUND(SUM(CASE WHEN effective_state = 'unavailable' THEN duration ELSE 0 END)) as unavailable,
+    ROUND(SUM(CASE WHEN effective_state = 'unknown' THEN duration ELSE 0 END)) as unknown
+  FROM effective
+)
+SELECT
+  CAST(available AS INTEGER),
+  CAST(unavailable AS INTEGER),
+  CAST(unknown AS INTEGER),
+  CASE
+    WHEN available + unavailable > 0
+    THEN ROUND(available * 100.0 / (available + unavailable), 4)
+    ELSE 100.0
+  END as availability
+FROM aggregated;
+EOSQL
+)
+fi
+
+# Execute and format output
+RESULT=$(sqlite3 -separator $'\t' "$TMPDB" "$SQL")
+
+# Handle empty result
+if [[ -z "$RESULT" ]]; then
+  echo -e "0\t0\t0\t100.0000"
+else
+  # Format availability to 4 decimal places
+  echo "$RESULT" | awk -F'\t' '{printf "%s\t%s\t%s\t%.4f\n", $1, $2, $3, $4}'
+fi
