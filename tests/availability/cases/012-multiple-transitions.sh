@@ -1,0 +1,16 @@
+#!/bin/bash
+# Test: Multiple transitions
+# Period: 0-1000
+# 0-200: OK (200s)
+# 200-400: CRITICAL (200s)
+# 400-700: OK (300s)
+# 700-1000: CRITICAL (300s)
+# Total: 500s OK, 500s CRITICAL = 50%
+
+cat << 'EOF' | "$CALC_SCRIPT" -v SINCE=0 -v BEFORE=1000
+0	OK
+200	CRITICAL
+400	OK
+700	CRITICAL
+EOF
+# ASSERT: 500	500	0	50.0000
