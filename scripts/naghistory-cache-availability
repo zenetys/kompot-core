@@ -1,0 +1,255 @@
+#!/bin/bash
+#
+# naghistory-cache - Refresh availability cache table
+#
+# Usage:
+#   naghistory-cache [OPTIONS]
+#
+# Options:
+#   -d, --db PATH       Database path (default: /var/lib/kompot/nagios/nagios-history.db)
+#   -D, --days N        Number of days to cache (default: 365)
+#   -f, --force         Force refresh all days (default: only missing/today)
+#   -v, --verbose       Verbose output
+#   -h, --help          Show this help
+#
+# The cache stores daily availability durations for each host+service combination.
+# Run via cron daily to keep the cache up-to-date.
+#
+
+set -euo pipefail
+
+HISTORY_DB=${KOMPOT_HISTORY_DB:-/var/lib/kompot/nagios/nagios-history.db}
+DAYS=365
+FORCE=0
+VERBOSE=0
+
+usage() {
+  sed -n '3,/^$/p' "$0" | sed 's/^# //' | sed 's/^#//'
+  exit "${1:-0}"
+}
+
+log() {
+  (( VERBOSE )) && echo "[$(date +%H:%M:%S)] $*" >&2
+}
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d|--db)      HISTORY_DB="$2"; shift 2 ;;
+    -D|--days)    DAYS="$2"; shift 2 ;;
+    -f|--force)   FORCE=1; shift ;;
+    -v|--verbose) VERBOSE=1; shift ;;
+    -h|--help)    usage 0 ;;
+    *)            echo "Unknown option: $1" >&2; usage 1 ;;
+  esac
+done
+
+[[ -r $HISTORY_DB ]] || { echo "Database not found: $HISTORY_DB" >&2; exit 1; }
+
+# Calculate date range
+TODAY=$(date -u +%Y-%m-%d)
+START_DATE=$(date -u -d "$DAYS days ago" +%Y-%m-%d)
+
+log "Refreshing cache from $START_DATE to $TODAY"
+
+# SQL to compute availability for a single day
+# This is run for each day that needs caching
+#
+# For services: correlates with host state (host DOWN = service unavailable)
+# For hosts: uses host state directly
+compute_day_sql() {
+  local day=$1
+  local next_day=$(date -u -d "$day + 1 day" +%Y-%m-%d)
+
+  cat << EOSQL
+-- Compute availability for $day (with host+service correlation)
+WITH
+-- ============ HOSTS (service IS NULL) ============
+-- Get distinct hosts
+hosts AS (
+  SELECT DISTINCT hostname FROM state
+  WHERE service IS NULL
+    AND (timestamp >= '$day' AND timestamp < '$next_day'
+         OR timestamp < '$day')
+),
+-- Host initial states (only real states, not FLAPPING events)
+host_initial AS (
+  SELECT hostname, state,
+         ROW_NUMBER() OVER (PARTITION BY hostname ORDER BY timestamp DESC) as rn
+  FROM state
+  WHERE service IS NULL AND timestamp < '$day'
+    AND state IN ('UP', 'DOWN', 'UNREACHABLE')
+),
+-- Host states during day (only real states)
+host_day_states AS (
+  SELECT hostname, state, timestamp
+  FROM state
+  WHERE service IS NULL AND timestamp >= '$day' AND timestamp < '$next_day'
+    AND state IN ('UP', 'DOWN', 'UNREACHABLE')
+),
+-- Combined host timeline
+host_timeline AS (
+  SELECT hostname, state, '$day 00:00:00' as timestamp
+  FROM host_initial WHERE rn = 1
+  UNION ALL
+  SELECT hostname, state, timestamp FROM host_day_states
+),
+-- Host durations
+host_durations AS (
+  SELECT hostname, NULL as service, state,
+    timestamp as start_ts,
+    COALESCE(LEAD(timestamp) OVER (PARTITION BY hostname ORDER BY timestamp), '$next_day 00:00:00') as end_ts
+  FROM host_timeline
+),
+-- Host aggregation (simple: UP=available, DOWN=unavailable, else=unknown)
+host_aggregated AS (
+  SELECT hostname, NULL as service,
+    SUM(CASE WHEN state = 'UP' THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END) as available,
+    SUM(CASE WHEN state = 'DOWN' THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END) as unavailable,
+    SUM(CASE WHEN state NOT IN ('UP', 'DOWN') THEN (julianday(end_ts) - julianday(start_ts)) * 86400 ELSE 0 END) as unknown
+  FROM host_durations
+  GROUP BY hostname
+),
+
+-- ============ SERVICES (with host correlation) ============
+-- Get distinct services
+services AS (
+  SELECT DISTINCT hostname, service FROM state
+  WHERE service IS NOT NULL
+    AND (timestamp >= '$day' AND timestamp < '$next_day'
+         OR timestamp < '$day')
+),
+-- All timestamps where either host or service state changes (for services only)
+service_events AS (
+  -- Service state changes (exclude FLAPPING events)
+  SELECT s.hostname, s.service, st.timestamp
+  FROM services s
+  JOIN state st ON st.hostname = s.hostname AND st.service = s.service
+  WHERE st.timestamp >= '$day' AND st.timestamp < '$next_day'
+    AND st.state NOT IN ('FLAPPING_STARTED', 'FLAPPING_STOPPED')
+  UNION
+  -- Host state changes (only real states: UP, DOWN, UNREACHABLE)
+  SELECT s.hostname, s.service, st.timestamp
+  FROM services s
+  JOIN state st ON st.hostname = s.hostname AND st.service IS NULL
+  WHERE st.timestamp >= '$day' AND st.timestamp < '$next_day'
+    AND st.state IN ('UP', 'DOWN', 'UNREACHABLE')
+  UNION
+  -- Day start
+  SELECT hostname, service, '$day 00:00:00' FROM services
+),
+-- At each event, get current host and service state via correlated subquery
+service_states_at_events AS (
+  SELECT
+    e.hostname, e.service, e.timestamp,
+    -- Service state at this time (exclude FLAPPING events)
+    (SELECT state FROM state s
+     WHERE s.hostname = e.hostname AND s.service = e.service AND s.timestamp <= e.timestamp
+       AND s.state NOT IN ('FLAPPING_STARTED', 'FLAPPING_STOPPED')
+     ORDER BY s.timestamp DESC LIMIT 1) as service_state,
+    -- Host state at this time (only real states: UP, DOWN, UNREACHABLE)
+    (SELECT state FROM state h
+     WHERE h.hostname = e.hostname AND h.service IS NULL AND h.timestamp <= e.timestamp
+       AND h.state IN ('UP', 'DOWN', 'UNREACHABLE')
+     ORDER BY h.timestamp DESC LIMIT 1) as host_state
+  FROM service_events e
+),
+-- Add end timestamp
+service_with_end AS (
+  SELECT hostname, service, timestamp, service_state, host_state,
+    COALESCE(LEAD(timestamp) OVER (PARTITION BY hostname, service ORDER BY timestamp), '$next_day 00:00:00') as end_ts
+  FROM service_states_at_events
+),
+-- Apply effective state logic and calculate durations
+service_effective AS (
+  SELECT hostname, service,
+    (julianday(end_ts) - julianday(timestamp)) * 86400 as duration,
+    CASE
+      WHEN host_state IN ('DOWN', 'UNREACHABLE') THEN 'unknown'
+      WHEN service_state = 'UNKNOWN' THEN 'unknown'
+      WHEN service_state IN ('OK', 'WARNING') THEN 'available'
+      WHEN service_state = 'CRITICAL' THEN 'unavailable'
+      ELSE 'unknown'
+    END as effective_state
+  FROM service_with_end
+  WHERE timestamp < '$next_day 00:00:00'
+),
+-- Service aggregation
+service_aggregated AS (
+  SELECT hostname, service,
+    SUM(CASE WHEN effective_state = 'available' THEN duration ELSE 0 END) as available,
+    SUM(CASE WHEN effective_state = 'unavailable' THEN duration ELSE 0 END) as unavailable,
+    SUM(CASE WHEN effective_state = 'unknown' THEN duration ELSE 0 END) as unknown
+  FROM service_effective
+  GROUP BY hostname, service
+),
+
+-- ============ COMBINE HOSTS AND SERVICES ============
+combined AS (
+  SELECT * FROM host_aggregated
+  UNION ALL
+  SELECT * FROM service_aggregated
+)
+INSERT OR REPLACE INTO availability_cache (hostname, service, date, available, unavailable, unknown)
+SELECT hostname, service, '$day', ROUND(available), ROUND(unavailable), ROUND(unknown)
+FROM combined
+WHERE available + unavailable + unknown > 0;
+EOSQL
+}
+
+# Determine which days need caching
+if (( FORCE )); then
+  # Refresh all days
+  log "Force mode: refreshing all $DAYS days"
+
+  # Delete existing cache for the period
+  sqlite3 "$HISTORY_DB" "DELETE FROM availability_cache WHERE date >= '$START_DATE';"
+
+  # Generate SQL for all days
+  current=$START_DATE
+  while [[ $current < $TODAY ]] || [[ $current == $TODAY ]]; do
+    log "Computing $current..."
+    compute_day_sql "$current" | sqlite3 "$HISTORY_DB"
+    current=$(date -u -d "$current + 1 day" +%Y-%m-%d)
+  done
+else
+  # Only refresh missing days and today
+  log "Incremental mode: refreshing missing days and today"
+
+  # Get list of cached days
+  CACHED_DAYS=$(sqlite3 "$HISTORY_DB" "SELECT DISTINCT date FROM availability_cache WHERE date >= '$START_DATE' ORDER BY date;")
+
+  # Always refresh today (partial day)
+  log "Refreshing today ($TODAY)..."
+  sqlite3 "$HISTORY_DB" "DELETE FROM availability_cache WHERE date = '$TODAY';"
+  compute_day_sql "$TODAY" | sqlite3 "$HISTORY_DB"
+
+  # Find and fill missing days
+  current=$START_DATE
+  while [[ $current < $TODAY ]]; do
+    if ! echo "$CACHED_DAYS" | grep -q "^$current$"; then
+      log "Computing missing day $current..."
+      compute_day_sql "$current" | sqlite3 "$HISTORY_DB"
+    fi
+    current=$(date -u -d "$current + 1 day" +%Y-%m-%d)
+  done
+fi
+
+# Report stats
+CACHE_COUNT=$(sqlite3 "$HISTORY_DB" "SELECT COUNT(*) FROM availability_cache WHERE date >= '$START_DATE';")
+ENTITY_COUNT=$(sqlite3 "$HISTORY_DB" "SELECT COUNT(DISTINCT hostname || '|' || COALESCE(service, '')) FROM availability_cache WHERE date >= '$START_DATE';")
+
+log "Cache complete: $CACHE_COUNT records for $ENTITY_COUNT entities"
+
+if (( VERBOSE )); then
+  echo "Cache statistics:"
+  sqlite3 -header -column "$HISTORY_DB" << EOSQL
+SELECT
+  COUNT(DISTINCT date) as days,
+  COUNT(DISTINCT hostname || '|' || COALESCE(service, '')) as entities,
+  COUNT(*) as records,
+  MIN(date) as first_date,
+  MAX(date) as last_date
+FROM availability_cache
+WHERE date >= '$START_DATE';
+EOSQL
+fi
