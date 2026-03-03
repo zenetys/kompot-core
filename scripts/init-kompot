@@ -12,6 +12,7 @@ SERVICES=(
     influxdb
     nagflux
     nagios
+    nagios-history
     centreon_vmware
     grafana-server
     httpd
