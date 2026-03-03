@@ -1,0 +1,38 @@
+[Unit]
+Description=Kompot Nagios History Tracker
+After=nagios.service
+Wants=nagios.service
+
+[Service]
+Type=simple
+
+User=nagios
+Group=nagios
+UMask=0022
+
+Environment=ZTAIL_INTERVAL=5
+Environment=ZTAIL_STATE_FILE=/var/lib/kompot/nagios/nagios-history.ztail
+Environment=NAGIOS_LOG_FILE=/var/log/nagios/nagios.log
+Environment=SQL_INIT=1
+Environment=SQL_BATCH=1000
+Environment=NAGIOS_HISTORY_DB=/var/lib/kompot/nagios/nagios-history.db
+EnvironmentFile=-/etc/sysconfig/nagios-history
+
+ExecStartPre=/usr/bin/install -D -d -o nagios -g nagios -m 0755 /var/lib/kompot/nagios
+ExecStart=/opt/kompot/bin/ztail2cmd -f -i $ZTAIL_INTERVAL -s $ZTAIL_STATE_FILE $NAGIOS_LOG_FILE -- \
+    sh -c '/opt/kompot/bin/naglog2sql -v INIT=$SQL_INIT -v BATCH=$SQL_BATCH |sqlite3 $NAGIOS_HISTORY_DB'
+
+Restart=on-failure
+RestartSec=10
+
+# Hardening
+ProtectSystem=strict
+PermissionsStartOnly=true
+ReadWritePaths=/var/lib/kompot
+ReadWritePaths=/var/log/nagios
+ProtectHome=yes
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

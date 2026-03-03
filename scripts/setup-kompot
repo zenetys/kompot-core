@@ -398,6 +398,12 @@ if ! is_docker; then
     [[ $REPLY == skip ]] || explain systemctl daemon-reload
 fi
 
+# nagios-history
+if ! is_docker; then
+    explain install-file --allow-disable /opt/kompot/share/configs/systemd/nagios-history.service /etc/systemd/system/nagios-history.service
+    [[ $REPLY == skip ]] || explain systemctl daemon-reload
+fi
+
 # snmp
 explain install-file /opt/kompot/share/configs/snmp/snmpd.local.conf /etc/snmp/
 explain install-file /opt/kompot/share/configs/snmp/snmptrapd.local.conf /etc/snmp/
@@ -496,7 +502,7 @@ explain sh -c 'CHECK_QUIET=1 /opt/kompot/share/configs/grafana/check-init-grafan
 # enable services at boot time
 if ! is_docker; then
     explain systemctl-enable-if-disabled centreon_vmware crond grafana-server httpd influxdb \
-        nagflux nagios rsyslog snmpd snmptrapd sshd
+        nagflux nagios nagios-history rsyslog snmpd snmptrapd sshd
 fi
 
 # MIGRATION
