@@ -1,0 +1,15 @@
+#!/bin/bash
+# Test: ISO format timestamps
+# Period: 2026-01-01 00:00:00 to 2026-01-02 00:00:00 (86400 seconds)
+# Initial OK at 2025-12-31 12:00:00
+# CRITICAL at 2026-01-01 12:00:00 (43200s into period)
+# Back to OK at 2026-01-01 18:00:00 (64800s into period)
+# OK: 43200 + 21600 = 64800s, CRITICAL: 21600s
+# Availability: 64800 / 86400 = 75%
+
+cat << 'EOF' | "$CALC_SCRIPT" -v SINCE="2026-01-01 00:00:00" -v BEFORE="2026-01-02 00:00:00"
+2025-12-31 12:00:00	OK
+2026-01-01 12:00:00	CRITICAL
+2026-01-01 18:00:00	OK
+EOF
+# ASSERT: 64800	21600	0	75.0000
