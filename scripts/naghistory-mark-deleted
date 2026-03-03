@@ -1,0 +1,135 @@
+#!/bin/bash
+#
+# naghistory-mark-deleted - Mark stale hosts/services as DELETED in history database
+#
+# Finds hosts/services that haven't received any state update for STALE_AFTER
+# seconds and marks them as DELETED. This handles cases where:
+# - A service has been disabled
+# - A host has been removed from monitoring
+#
+# The DELETED state is treated as 'unknown' in availability calculations.
+#
+# Usage: naghistory-mark-deleted [-d database] [-t stale_after] [-n] [-v]
+#
+# Options:
+#   -d database     Path to history database (default: /var/lib/kompot/nagios/nagios-history.db)
+#   -t stale_after  Seconds before marking as removed (default: 7*86400 = 1w)
+#   -n              Dry-run mode (show what would be done)
+#   -v              Verbose mode
+#
+
+set -euo pipefail
+
+# Defaults
+DB="${KOMPOT_HISTORY_DB:-/var/lib/kompot/nagios/nagios-history.db}"
+STALE_AFTER=$((7*86400)) # 1 week
+DRY_RUN=0
+VERBOSE=0
+
+# Parse arguments
+while getopts "d:t:nv" opt; do
+  case $opt in
+    d) DB="$OPTARG" ;;
+    t) STALE_AFTER="$OPTARG" ;;
+    n) DRY_RUN=1 ;;
+    v) VERBOSE=1 ;;
+    *) echo "Usage: $0 [-d database] [-t stale_after] [-n] [-v]" >&2; exit 1 ;;
+  esac
+done
+
+log() {
+  (( VERBOSE )) && echo "[$(date '+%H:%M:%S')] $*" >&2
+}
+
+# Check database exists
+[[ -r "$DB" ]] || { echo "Database not found: $DB" >&2; exit 1; }
+
+NOW=$(date -u '+%Y-%m-%d %H:%M:%S')
+NOW_UNIX=$(date -u '+%s')
+CUTOFF_UNIX=$((NOW_UNIX - STALE_AFTER))
+CUTOFF_ISO=$(date -u -d "@$CUTOFF_UNIX" '+%Y-%m-%d %H:%M:%S')
+
+log "Database: $DB"
+log "Stale after: $STALE_AFTER seconds"
+log "Cutoff time: $CUTOFF_ISO"
+
+# Find hosts/services that:
+# 1. Have a last state older than CUTOFF
+# 2. Last state is NOT already DELETED
+# This is done entirely in SQL
+
+if (( DRY_RUN )); then
+  log "Dry-run mode: showing what would be marked as DELETED"
+
+  echo "=== Hosts to mark as DELETED ==="
+  sqlite3 -separator $'\t' "$DB" << EOSQL
+SELECT hostname, MAX(timestamp) as last_seen,
+       (SELECT state FROM state s2
+        WHERE s2.hostname = s1.hostname AND s2.service IS NULL
+        ORDER BY timestamp DESC LIMIT 1) as last_state
+FROM state s1
+WHERE service IS NULL
+GROUP BY hostname
+HAVING MAX(timestamp) < '$CUTOFF_ISO'
+   AND (SELECT state FROM state s2
+        WHERE s2.hostname = s1.hostname AND s2.service IS NULL
+        ORDER BY timestamp DESC LIMIT 1) != 'DELETED';
+EOSQL
+
+  echo ""
+  echo "=== Services to mark as DELETED ==="
+  sqlite3 -separator $'\t' "$DB" << EOSQL
+SELECT hostname, service, MAX(timestamp) as last_seen,
+       (SELECT state FROM state s2
+        WHERE s2.hostname = s1.hostname AND s2.service = s1.service
+        ORDER BY timestamp DESC LIMIT 1) as last_state
+FROM state s1
+WHERE service IS NOT NULL
+GROUP BY hostname, service
+HAVING MAX(timestamp) < '$CUTOFF_ISO'
+   AND (SELECT state FROM state s2
+        WHERE s2.hostname = s1.hostname AND s2.service = s1.service
+        ORDER BY timestamp DESC LIMIT 1) != 'DELETED';
+EOSQL
+
+else
+  log "Marking stale hosts/services as DELETED..."
+
+  # Insert DELETED state for stale hosts
+  HOSTS_MARKED=$(sqlite3 "$DB" << EOSQL
+INSERT INTO state (hostname, service, timestamp, state)
+SELECT hostname, NULL, '$NOW', 'DELETED'
+FROM (
+  SELECT hostname, MAX(timestamp) as last_ts
+  FROM state
+  WHERE service IS NULL
+  GROUP BY hostname
+  HAVING MAX(timestamp) < '$CUTOFF_ISO'
+     AND (SELECT state FROM state s2
+          WHERE s2.hostname = state.hostname AND s2.service IS NULL
+          ORDER BY timestamp DESC LIMIT 1) != 'DELETED'
+);
+SELECT changes();
+EOSQL
+)
+
+  # Insert DELETED state for stale services
+  SERVICES_MARKED=$(sqlite3 "$DB" << EOSQL
+INSERT INTO state (hostname, service, timestamp, state)
+SELECT hostname, service, '$NOW', 'DELETED'
+FROM (
+  SELECT hostname, service, MAX(timestamp) as last_ts
+  FROM state
+  WHERE service IS NOT NULL
+  GROUP BY hostname, service
+  HAVING MAX(timestamp) < '$CUTOFF_ISO'
+     AND (SELECT state FROM state s2
+          WHERE s2.hostname = state.hostname AND s2.service = state.service
+          ORDER BY timestamp DESC LIMIT 1) != 'DELETED'
+);
+SELECT changes();
+EOSQL
+)
+
+  echo "Marked $HOSTS_MARKED hosts and $SERVICES_MARKED services as DELETED"
+fi
