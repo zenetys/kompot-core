@@ -76,7 +76,14 @@ function has_journald() {
 }
 
 function is_docker() {
-    [[ -f /.dockerenv || -f /run/.containerenv ]]
+    local initcmd
+    initcmd=$(ps -q 1 --no-headers -o comm)
+    # always assume normal install if init is systemd => return FALSE
+    [[ $initcmd == systemd ]] && return 1
+    # docker / podman => return TRUE
+    [[ -f /.dockerenv || -f /run/.containerenv ]] && return 0
+    # default FALSE
+    return 1
 }
 
 function rpm_verify_file() {
