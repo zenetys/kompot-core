@@ -29,7 +29,8 @@ usage() {
 }
 
 log() {
-  (( VERBOSE )) && echo "[$(date +%H:%M:%S)] $*" >&2
+  (( VERBOSE )) || return 0
+  echo "[$(date +%H:%M:%S)] $*" >&2
 }
 
 while [[ $# -gt 0 ]]; do
