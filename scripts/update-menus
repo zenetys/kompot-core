@@ -96,6 +96,16 @@ CONFIG_HEADER='{
       "name": "Bac à état",
       "to": "/panel",
       "icon": "mdi-table"
+    },
+    {
+      "i18nName": "menuHistory",
+      "to": "/history",
+      "icon": "mdi-history"
+    },
+    {
+      "i18nName": "menuAvailability",
+      "to": "/availability",
+      "icon": "mdi-percent"
     }'
 
 IPSLA_HEADER='
