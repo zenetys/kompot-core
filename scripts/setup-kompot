@@ -482,7 +482,7 @@ fi
 
 # logrotate
 if is_docker; then
-    explain sed-file -re 's!systemctl kill -s ([^ ]+) rsyslog.service!killall -\1 rsyslogd!' /etc/logrotate.d/syslog
+    explain sed-file -re 's!systemctl.* -s ([^ ]+).* rsyslog.service!killall -\1 rsyslogd!' /etc/logrotate.d/rsyslog
     explain sed-file -re 's![^ ]+/systemctl reload httpd.service!/usr/sbin/httpd -k graceful!' /etc/logrotate.d/httpd
 fi
 
