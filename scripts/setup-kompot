@@ -12,7 +12,7 @@ INSTALL_DIR_DEFAULTS=( -m 0755 -o root -g root )
 KOMPOT_INSTALL_VAR_LOG_FILE=/opt/kompot/share/install.var-log
 KOMPOT_PERSIST_VERSION_FILE=/etc/kompot/.version
 { KOMPOT_PERSIST_VERSION=$(< "$KOMPOT_PERSIST_VERSION_FILE"); } 2>/dev/null
-KOMPOT_VERSION=$(rpm -q kompot-setup --qf '%{version}-%{release}')
+KOMPOT_VERSION=$(rpm -q kompot --qf '%{version}-%{release}')
 
 [[ -t 0 ]] && INTERACTIVE=1 || INTERACTIVE=
 
