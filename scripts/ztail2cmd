@@ -12,12 +12,12 @@
 # Tracks file position and inode to handle:
 # - Resume from last position after restart
 # - Log rotation (inode change or file truncation)
-# - Creates a hardlink to preserve access to rotated file
+# - In follow mode, keeps an open fd to preserve access to rotated file
+#   (no hardlink, so the file's link count stays at 1)
 #
-# State file format (3 lines):
+# State file format (2 lines):
 #   inode
 #   offset
-#   hardlink_path (optional)
 #
 # Environment variables:
 #   ZTAIL_SUFFIX    State file suffix (default: ztail)
@@ -91,26 +91,22 @@ if [[ -z $STATE_FILE ]]; then
     STATE_FILE="${FILE}.${ZTAIL_SUFFIX}"
 fi
 
-STATE_DIR=$(dirname "$STATE_FILE")
-HARDLINK_DIR=$STATE_DIR
-
 # Read state file if exists
 read_state() {
     if [[ -f $STATE_FILE ]]; then
-        { read -r SAVED_INODE; read -r SAVED_OFFSET; read -r SAVED_HARDLINK; } < "$STATE_FILE"
+        { read -r SAVED_INODE; read -r SAVED_OFFSET; } < "$STATE_FILE"
         SAVED_INODE=${SAVED_INODE:-0}
         SAVED_OFFSET=${SAVED_OFFSET:-0}
     else
         SAVED_INODE=0
         SAVED_OFFSET=0
-        SAVED_HARDLINK=""
     fi
 }
 
 # Write state file
 write_state() {
-    local inode=$1 offset=$2 hardlink=${3:-}
-    printf '%s\n%s\n%s\n' "$inode" "$offset" "$hardlink" > "$STATE_FILE"
+    local inode=$1 offset=$2
+    printf '%s\n%s\n' "$inode" "$offset" > "$STATE_FILE"
 }
 
 # Get file inode
@@ -123,23 +119,29 @@ get_size() {
     stat -c %s "$1" 2>/dev/null || echo 0
 }
 
-# Create hardlink for rotation safety
-create_hardlink() {
-    local src=$1
-    local link="${HARDLINK_DIR}/.ztail_$$_$(basename "$src")"
-    if ln "$src" "$link" 2>/dev/null; then
-        echo "$link"
+# fd tracking for rotation safety (follow mode only)
+FILE_FD=""
+
+open_file_fd() {
+    exec {FILE_FD}<"$FILE"
+}
+
+close_file_fd() {
+    if [[ -n $FILE_FD ]]; then
+        exec {FILE_FD}<&- 2>/dev/null || true
+        FILE_FD=""
     fi
 }
 
-# Remove old hardlink
-remove_hardlink() {
-    local link=$1
-    [[ -n $link && -f $link ]] && rm -f "$link"
-    return 0
+# Process data from offset via fd, pipe to command
+process_fd() {
+    local fd=$1
+    local offset=$2
+
+    tail -c +"$((offset + 1))" "/proc/self/fd/$fd" | "${CMD[@]}"
 }
 
-# Process file from offset, pipe to command
+# Process data from file path, pipe to command
 process_file() {
     local file=$1
     local offset=$2
@@ -154,6 +156,7 @@ process_iteration() {
     if [[ ! -f $FILE ]]; then
         # In follow mode, wait for file to appear
         if [[ $FOLLOW -eq 1 ]]; then
+            close_file_fd
             return 0
         fi
         echo "[ztail] File not found: $FILE" >&2
@@ -168,44 +171,44 @@ process_iteration() {
         # Inode changed - file was rotated/replaced
         echo "[ztail] Rotation detected (inode changed: $SAVED_INODE -> $current_inode)" >&2
 
-        # Finish reading old file via hardlink if available
-        if [[ -n $SAVED_HARDLINK && -f $SAVED_HARDLINK ]]; then
-            echo "[ztail] Finishing old file via hardlink" >&2
-            process_file "$SAVED_HARDLINK" "$SAVED_OFFSET" >/dev/null
-            remove_hardlink "$SAVED_HARDLINK"
+        # Finish reading old file via open fd if available (follow mode)
+        if [[ -n $FILE_FD ]]; then
+            echo "[ztail] Finishing old file via open fd" >&2
+            process_fd "$FILE_FD" "$SAVED_OFFSET"
+            close_file_fd
         fi
 
         # Start fresh on new file
         SAVED_OFFSET=0
-        SAVED_HARDLINK=""
 
     elif [[ $SAVED_OFFSET -gt $current_size ]]; then
         # File was truncated (copytruncate rotation)
         echo "[ztail] Rotation detected (file truncated: $SAVED_OFFSET > $current_size)" >&2
         SAVED_OFFSET=0
-        remove_hardlink "$SAVED_HARDLINK"
-        SAVED_HARDLINK=""
+        close_file_fd
     fi
 
     # Skip if no new data
     if [[ $SAVED_OFFSET -ge $current_size ]]; then
         # Persist new inode after rotation to empty file
         if [[ $SAVED_INODE -ne $current_inode ]]; then
-            write_state "$current_inode" "$current_size" ""
+            write_state "$current_inode" "$current_size"
         fi
         return 0
     fi
 
-    # Create/update hardlink for current file
-    remove_hardlink "$SAVED_HARDLINK"
-    local hardlink=$(create_hardlink "$FILE")
-
     # Process new data
     process_file "$FILE" "$SAVED_OFFSET"
 
+    # Keep an fd open for rotation safety (follow mode only)
+    if [[ $FOLLOW -eq 1 ]]; then
+        close_file_fd
+        open_file_fd
+    fi
+
     # Save state with new size
     local new_size=$(get_size "$FILE")
-    write_state "$current_inode" "$new_size" "$hardlink"
+    write_state "$current_inode" "$new_size"
 }
 
 # Open a pipe that blocks forever (no writer, no EOF thanks to read-write mode)
