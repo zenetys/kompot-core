@@ -214,7 +214,8 @@ process_iteration() {
 # Open a pipe that blocks forever (no writer, no EOF thanks to read-write mode)
 exec {WAIT_FD}<> <(:)
 
-# Wait for file change using inotifywait (event-driven, no polling)
+# Wait for file change, actually it is just a "sleep" when
+# inotifywait is not used.
 wait_for_change() {
     read -t "$INTERVAL" dummy <&$WAIT_FD || true
     # if [[ -f $FILE ]]; then
