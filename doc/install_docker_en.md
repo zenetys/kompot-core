@@ -1,6 +1,6 @@
 ## Run KOMPOT as Docker container
 
-We recommend [using podman](./install_podman_systemd.md) for its integration with systemd. That way KOMPOT is an application controled like any systemd service.
+We recommend [using podman](./install_podman_systemd_en.md) for its integration with systemd. That way KOMPOT is an application controled like any systemd service.
 
 **Installation:**
 
