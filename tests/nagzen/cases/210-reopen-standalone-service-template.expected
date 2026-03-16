@@ -1,0 +1,41 @@
+define service {
+  check_command        check-vsphere
+  __CONNECTOR_HOSTNAME 127.0.0.1
+  __CONNECTOR_PORT     5700
+  register             0
+  name                 api-vsphere-auth
+  use                  generic-service
+}
+define service {
+  __CONNECTOR_HOSTNAME 172.17.0.1
+  register             0
+  name                 api-vsphere-auth__1
+  use                  api-vsphere-auth
+}
+#### _vmware ####
+define host {
+  register             0
+  name                 _vmware
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _vmware:api-vsphere-auth
+  display_name         API-VSPHERE-AUTH
+  use                  api-vsphere-auth__1
+}
+
+#### esxi01:_vmware ####
+define host {
+  host_name            esxi01
+  display_name         esxi01
+  address              10.0.0.1
+  use                  _vmware
+}
+define service {
+  service_description  API-VSPHERE-AUTH
+  display_name         API-VSPHERE-AUTH
+  host_name            esxi01
+  use                  _vmware:api-vsphere-auth
+}
+

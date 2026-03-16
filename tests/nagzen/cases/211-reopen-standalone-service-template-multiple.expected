@@ -1,0 +1,47 @@
+define service {
+  check_command        check-dummy
+  __WARN               80
+  __CRIT               95
+  register             0
+  name                 my-check
+  use                  generic-service
+}
+define service {
+  __WARN               70
+  register             0
+  name                 my-check__1
+  use                  my-check
+}
+define service {
+  __CRIT               90
+  register             0
+  name                 my-check__2
+  use                  my-check__1
+}
+#### _linux ####
+define host {
+  register             0
+  name                 _linux
+  use                  generic-host
+}
+define service {
+  register             0
+  name                 _linux:my-check
+  display_name         MY-CHECK
+  use                  my-check__2
+}
+
+#### server1:_linux ####
+define host {
+  host_name            server1
+  display_name         server1
+  address              10.0.0.1
+  use                  _linux
+}
+define service {
+  service_description  MY-CHECK
+  display_name         MY-CHECK
+  host_name            server1
+  use                  _linux:my-check
+}
+

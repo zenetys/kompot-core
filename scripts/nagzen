@@ -540,14 +540,32 @@ function host-service() {
   build_key -v desc "${dname,,}"
   build_key -v use "${use,,}"
 
+  # Resolve standalone service template alias to latest version
+  if [[ ${use} && ${SERVICES[${use}]} && ${SERVICES[${use}]} != "${use}" ]]; then
+    use="${SERVICES[${use}]}"
+  fi
+
   if [[ $1 == --template ]]; then
     shift
-    attrs=(
-      register=0
-      use="${use:-${DEFAULT_SERVICE_TEMPLATE}}"
-      name="${desc}"
-    )
-    SERVICES[${desc}]="${desc}"
+    if [[ ${SERVICES[${desc}]} ]]; then
+      # Reopen existing standalone service template - override by inheritance
+      (( ++SERVICE_OVERRIDE_COUNT[${desc}] ))
+      local count=${SERVICE_OVERRIDE_COUNT[${desc}]}
+      local new_name="${desc}__${count}"
+      attrs=(
+        register=0
+        use="${SERVICES[${desc}]}"
+        name="${new_name}"
+      )
+      SERVICES[${desc}]="${new_name}"
+    else
+      attrs=(
+        register=0
+        use="${use:-${DEFAULT_SERVICE_TEMPLATE}}"
+        name="${desc}"
+      )
+      SERVICES[${desc}]="${desc}"
+    fi
   elif [[ $1 == --disable ]]; then
     DISABLED[${CURRENT_HOST}]+="${dname}${LIST_SEP}"
     return 0
