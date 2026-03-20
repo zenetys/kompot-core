@@ -16,6 +16,8 @@ crb enable
 (cd /etc/yum.repos.d; curl -OL https://packages.zenetys.com/projects/kompot/latest/redhat/kompot.repo)
 rpm --import https://rpm.grafana.com/gpg.key
 rpm --import https://repos.influxdata.com/influxdata-archive.key
+# replace standard distro package rsyslog by rsyslog8z build by zenetys
+dnf --setopt install_weak_deps=0 install rsyslog8z --allowerasing
 dnf --setopt install_weak_deps=0 install kompot
 /opt/kompot/bin/init-kompot restart
 ```
