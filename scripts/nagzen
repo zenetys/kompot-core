@@ -306,6 +306,7 @@ function host() {
   [[ ${1} == --template ]] && hostid="_${hostid,,}"
 
   CURRENT_HOST="${hostid}"
+  CURRENT_HOST_ADDRESS=
 
   # For template reopen without parent change: redirect to latest version if exists
   if [[ ${1} == --template && -z ${use} && ${HOST_LATEST[${CURRENT_HOST}]} ]]; then
@@ -415,6 +416,7 @@ function host() {
       address="${1:10}"
       use="${use:-${DEFAULT_HOST_TEMPLATE}}"
     )
+    CURRENT_HOST_ADDRESS="${1:10}"
     shift
   else
     fatal "bad parameter $1, bypass"
@@ -515,6 +517,7 @@ function host-end() {
   echo
 
   unset CURRENT_HOST
+  unset CURRENT_HOST_ADDRESS
   unset IS_HOST_TEMPLATE
 }
 
