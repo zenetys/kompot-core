@@ -18,13 +18,6 @@ define host {
   name                 _mydevice
   use                  generic-host
 }
-define service {
-  __PORT               5800
-  register             0
-  name                 _mydevice:my-connector
-  display_name         MY-CONNECTOR
-  use                  my-connector__1
-}
 
 #### device01:_mydevice ####
 define host {
@@ -40,3 +33,10 @@ define service {
   use                  _mydevice:my-connector
 }
 
+define service {
+  __PORT               5800
+  register             0
+  name                 _mydevice:my-connector
+  display_name         MY-CONNECTOR
+  use                  my-connector__1
+}

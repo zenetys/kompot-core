@@ -4,13 +4,6 @@ define host {
   name                 _linux
   use                  generic-host
 }
-define service {
-  __PORT               22
-  register             0
-  name                 _linux:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
 
 #### server1:_linux ####
 define host {

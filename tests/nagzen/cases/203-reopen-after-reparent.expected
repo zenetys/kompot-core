@@ -4,24 +4,12 @@ define host {
   name                 _base
   use                  generic-host
 }
-define service {
-  register             0
-  name                 _base:base-svc
-  display_name         BASE-SVC
-  use                  generic-service
-}
 
 #### _other ####
 define host {
   register             0
   name                 _other
   use                  generic-host
-}
-define service {
-  register             0
-  name                 _other:other-svc
-  display_name         OTHER-SVC
-  use                  generic-service
 }
 
 #### _linux:_base ####
@@ -30,12 +18,6 @@ define host {
   name                 _linux
   use                  _base
 }
-define service {
-  register             0
-  name                 _linux:cpu
-  display_name         CPU
-  use                  generic-service
-}
 
 #### _linux__1:_other ####
 define host {
@@ -43,25 +25,12 @@ define host {
   name                 _linux__1
   use                  _other
 }
-define service {
-  register             0
-  name                 _linux__1:mem
-  display_name         MEM
-  use                  generic-service
-}
 
 define service {
   register             0
   name                 _linux__1:other-svc__1
   display_name         OTHER-SVC
   use                  _other:other-svc
-}
-define service {
-  __PORT               2222
-  register             0
-  name                 _linux__1:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
 }
 
 #### server1:_linux__1 ####
@@ -90,3 +59,34 @@ define service {
   use                  _linux__1:adm-ssh
 }
 
+define service {
+  register             0
+  name                 _base:base-svc
+  display_name         BASE-SVC
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _other:other-svc
+  display_name         OTHER-SVC
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _linux__1:mem
+  display_name         MEM
+  use                  generic-service
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _linux__1:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}

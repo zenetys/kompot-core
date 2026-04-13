@@ -11,24 +11,6 @@ define host {
   name                 _webserver
   use                  _linux
 }
-define service {
-  register             0
-  name                 _webserver:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
-define service {
-  register             0
-  name                 _webserver:adm-https
-  display_name         ADM-HTTPS
-  use                  generic-service
-}
-define service {
-  register             0
-  name                 _webserver:cpu
-  display_name         CPU
-  use                  generic-service
-}
 
 #### myserver:_webserver ####
 define host {
@@ -56,3 +38,21 @@ define service {
   use                  _webserver:cpu
 }
 
+define service {
+  register             0
+  name                 _webserver:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _webserver:adm-https
+  display_name         ADM-HTTPS
+  use                  generic-service
+}
+define service {
+  register             0
+  name                 _webserver:cpu
+  display_name         CPU
+  use                  generic-service
+}

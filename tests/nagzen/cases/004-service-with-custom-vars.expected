@@ -11,21 +11,6 @@ define host {
   name                 _monitored
   use                  _linux
 }
-define service {
-  __PORT               2222
-  register             0
-  name                 _monitored:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
-define service {
-  __WARNING            75
-  __CRITICAL           90
-  register             0
-  name                 _monitored:cpu
-  display_name         CPU
-  use                  generic-service
-}
 
 #### myserver:_monitored ####
 define host {
@@ -47,3 +32,18 @@ define service {
   use                  _monitored:cpu
 }
 
+define service {
+  __PORT               2222
+  register             0
+  name                 _monitored:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  __WARNING            75
+  __CRITICAL           90
+  register             0
+  name                 _monitored:cpu
+  display_name         CPU
+  use                  generic-service
+}

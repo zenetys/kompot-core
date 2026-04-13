@@ -12,12 +12,6 @@ define host {
   name                 _linux
   use                  generic-host
 }
-define service {
-  register             0
-  name                 _linux:swap
-  display_name         SWAP
-  use                  snmp-linux-swap
-}
 
 #### testhost:_linux ####
 define host {
@@ -34,3 +28,9 @@ define service {
   use                  _linux:swap
 }
 
+define service {
+  register             0
+  name                 _linux:swap
+  display_name         SWAP
+  use                  snmp-linux-swap
+}

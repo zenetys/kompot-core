@@ -12,19 +12,6 @@ define host {
   name                 _linux
   use                  generic-host
 }
-define service {
-  register             0
-  name                 _linux:swap
-  display_name         SWAP
-  use                  snmp-linux-swap
-}
-define service {
-  __PORT               22
-  register             0
-  name                 _linux:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
 
 #### _debian:_linux ####
 define host {
@@ -38,13 +25,6 @@ define host {
   register             0
   name                 _debian2244
   use                  _debian
-}
-define service {
-  __PORT               2244
-  register             0
-  name                 _debian2244:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
 }
 
 #### vipi:_debian2244 ####
@@ -68,3 +48,23 @@ define service {
   use                  _debian2244:adm-ssh
 }
 
+define service {
+  register             0
+  name                 _linux:swap
+  display_name         SWAP
+  use                  snmp-linux-swap
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  __PORT               2244
+  register             0
+  name                 _debian2244:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}

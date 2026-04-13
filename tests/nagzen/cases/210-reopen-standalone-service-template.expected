@@ -18,12 +18,6 @@ define host {
   name                 _vmware
   use                  generic-host
 }
-define service {
-  register             0
-  name                 _vmware:api-vsphere-auth
-  display_name         API-VSPHERE-AUTH
-  use                  api-vsphere-auth__1
-}
 
 #### esxi01:_vmware ####
 define host {
@@ -39,3 +33,9 @@ define service {
   use                  _vmware:api-vsphere-auth
 }
 
+define service {
+  register             0
+  name                 _vmware:api-vsphere-auth
+  display_name         API-VSPHERE-AUTH
+  use                  api-vsphere-auth__1
+}

@@ -23,19 +23,6 @@ define host {
   name                 _myhost
   use                  _linux
 }
-define service {
-  register             0
-  name                 _myhost:my-cpu
-  display_name         MY-CPU
-  use                  snmp-linux-cpu
-}
-define service {
-  __WARNING            80
-  register             0
-  name                 _myhost:my-mem
-  display_name         MY-MEM
-  use                  snmp-linux-mem
-}
 
 #### server1:_myhost ####
 define host {
@@ -57,3 +44,16 @@ define service {
   use                  _myhost:my-mem
 }
 
+define service {
+  register             0
+  name                 _myhost:my-cpu
+  display_name         MY-CPU
+  use                  snmp-linux-cpu
+}
+define service {
+  __WARNING            80
+  register             0
+  name                 _myhost:my-mem
+  display_name         MY-MEM
+  use                  snmp-linux-mem
+}

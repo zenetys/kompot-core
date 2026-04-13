@@ -101,8 +101,8 @@ run_nagzen() {
         # Source the test file (this output we capture)
         source "$source_file"
 
-        # Trigger host-end for any pending host
-        host-end 2>/dev/null || true
+        # Finalize: close pending host and emit deferred template services
+        nagzen-end 2>/dev/null || true
 
         # Restore trace state
         (( _trace_was_on )) && set -x || true
