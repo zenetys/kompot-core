@@ -1,0 +1,71 @@
+define service {
+  check_command        check-connector
+  __HOST               127.0.0.1
+  __PORT               5700
+  __TIMEOUT            30
+  register             0
+  name                 my-connector
+  use                  generic-service
+}
+#### _mydevice ####
+define host {
+  register             0
+  name                 _mydevice
+  use                  generic-host
+}
+define service {
+  __PORT               5800
+  __LABEL              primary
+  register             0
+  name                 _mydevice:connector
+  display_name         CONNECTOR
+  use                  my-connector
+}
+
+#### _mydevice-v2:_mydevice ####
+define host {
+  register             0
+  name                 _mydevice-v2
+  use                  _mydevice
+}
+define service {
+  __HOST               172.17.0.1
+  register             0
+  name                 my-connector__1
+  use                  my-connector
+}
+define service {
+  register             0
+  name                 _mydevice:connector__1
+  display_name         CONNECTOR
+  use                  my-connector__1
+}
+
+#### device01:_mydevice ####
+define host {
+  host_name            device01
+  display_name         device01
+  address              10.0.0.1
+  use                  _mydevice
+}
+define service {
+  service_description  CONNECTOR
+  display_name         CONNECTOR
+  host_name            device01
+  use                  _mydevice:connector__1
+}
+
+#### device02:_mydevice-v2 ####
+define host {
+  host_name            device02
+  display_name         device02
+  address              10.0.0.2
+  use                  _mydevice-v2
+}
+define service {
+  service_description  CONNECTOR
+  display_name         CONNECTOR
+  host_name            device02
+  use                  _mydevice:connector__1
+}
+

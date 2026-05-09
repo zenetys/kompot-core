@@ -247,15 +247,29 @@ function propagate_to_children() {
   done
 }
 
-# Emit all deferred host template services with resolved use= references.
-# Called at the end of processing so standalone reopens are taken into account.
-function emit_pending_services() {
-  local key
-  for key in "${PENDING_SVC_ORDER[@]}"; do
-    local host_tpl="${key%%:*}"
-    local svc_desc="${key#*:}"
-    local standalone_ref="${PENDING_SVC_REF[${key}]}"
-    local resolved_use="${SERVICES[${standalone_ref}]:-${DEFAULT_SERVICE_TEMPLATE}}"
+# Propagate standalone service template reopen to all host template services
+# that were declared before the reopen and still reference the old version.
+# Usage: propagate_standalone_reopen OLD_STANDALONE NEW_STANDALONE
+function propagate_standalone_reopen() {
+  local old_name=$1
+  local new_name=$2
+  local svc_key
+
+  for svc_key in "${!SERVICE_USE[@]}"; do
+    # Only process entries that reference the old standalone
+    [[ ${SERVICE_USE[${svc_key}]} != "${old_name}" ]] && continue
+
+    # Extract host template and service desc from key (format: _host:desc)
+    local host_tpl="${svc_key%%:*}"
+    local svc_desc="${svc_key#*:}"
+
+    # Skip non-templates
+    [[ ${host_tpl:0:1} != "_" ]] && continue
+
+    # Create intermediate template that uses the new standalone version
+    (( ++SERVICE_OVERRIDE_COUNT[${svc_key}] ))
+    local count=${SERVICE_OVERRIDE_COUNT[${svc_key}]}
+    local new_template="${svc_key}__${count}"
 
     # Find display name from HOST_SERVICES
     local display
@@ -265,18 +279,15 @@ function emit_pending_services() {
       [[ ${desc_check} == "${svc_desc}" ]] && break
     done
 
-    # Restore extra args
-    local saved_ifs="$IFS"
-    IFS=$'\x1f'
-    local -a extra_args=(${PENDING_SVC_ARGS[${key}]:-})
-    IFS="$saved_ifs"
-    [[ ${#extra_args[@]} == 1 && -z ${extra_args[0]} ]] && extra_args=()
-
-    dump_nagios_object service "${extra_args[@]}" \
+    dump_nagios_object service \
       "register=0" \
-      "name=${SERVICES[${key}]}" \
+      "name=${new_template}" \
       "display_name=${display}" \
-      "use=${resolved_use}"
+      "use=${new_name}"
+    SERVICE_USE[${svc_key}]="${new_name}"
+
+    # Propagate to descendant host templates
+    propagate_to_children "${host_tpl}" "${svc_desc}" "${display}"
   done
 }
 
@@ -573,9 +584,6 @@ function host-service() {
   build_key -v desc "${dname,,}"
   build_key -v use "${use,,}"
 
-  # Save unresolved use for deferred host template services
-  local raw_use="${use}"
-
   # Resolve standalone service template alias to latest version
   if [[ ${use} && ${SERVICES[${use}]} && ${SERVICES[${use}]} != "${use}" ]]; then
     use="${SERVICES[${use}]}"
@@ -607,7 +615,6 @@ function host-service() {
     DISABLED[${CURRENT_HOST}]+="${dname}${LIST_SEP}"
     return 0
   elif [[ ${IS_HOST_TEMPLATE} == 1 && ${CURRENT_HOST} ]]; then
-    local is_pending=0
     # For override by inheritance: create intermediate template if service already exists
     local effective_use
     local template_name
@@ -619,8 +626,7 @@ function host-service() {
       # Inherit from the previous template (original or previous override)
       effective_use="${SERVICES[${CURRENT_HOST}:${desc}]}"
     else
-      # New service - defer emission so standalone reopens are resolved at the end
-      is_pending=1
+      # New service - compute 'use=' normally
       effective_use="${use:-${SERVICES[${desc}]:-${DEFAULT_SERVICE_TEMPLATE}}}"
       template_name="${CURRENT_HOST}:${desc}"
       # Only add to HOST_SERVICES for new services (avoid duplicates)
@@ -682,17 +688,11 @@ function host-service() {
     set -- "${resolved_args[@]}"
   fi
 
-  if [[ ${is_pending:-0} == 1 ]]; then
-    # Deferred host template service: store for emission at the end
-    # so standalone reopens are resolved to the latest version
-    local saved_ifs="$IFS"
-    IFS=$'\x1f'
-    PENDING_SVC_ARGS[${CURRENT_HOST}:${desc}]="$*"
-    IFS="$saved_ifs"
-    PENDING_SVC_REF[${CURRENT_HOST}:${desc}]="${raw_use:-${desc}}"
-    PENDING_SVC_ORDER+=("${CURRENT_HOST}:${desc}")
-  else
-    dump_nagios_object service "$@" "${attrs[@]}"
+  dump_nagios_object service "$@" "${attrs[@]}"
+
+  # After emitting standalone reopen, propagate to host templates declared before
+  if [[ ${old_standalone:-} ]]; then
+    propagate_standalone_reopen "${old_standalone}" "${new_name}"
   fi
 }
 
@@ -720,11 +720,6 @@ declare -A SERVICES=( )
 # that need updating when the template is reopened.
 declare -A SERVICE_USE=( )
 declare -A SERVICE_OVERRIDE_COUNT=( )  # Tracks override count for intermediate templates
-# Deferred host template services: stored at declaration, emitted at the end
-# with resolved use= so standalone reopens are taken into account.
-declare -A PENDING_SVC_ARGS=( )   # key=host:desc, value=extra args (x1f-separated)
-declare -A PENDING_SVC_REF=( )    # key=host:desc, value=base standalone reference key
-declare -a PENDING_SVC_ORDER=( )  # ordered list of host:desc keys for emission
 declare -A DISABLED=( )
 declare -A HOST_SERVICES=( )
 declare -A HOST_TEMPLATE=( )
@@ -741,7 +736,6 @@ declare IS_HOST_TEMPLATE
 
 function nagzen-end() {
   host-end
-  emit_pending_services
 }
 
 (( ${#BASH_SOURCE[@]} > 1 )) && return
