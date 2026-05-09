@@ -4,6 +4,14 @@ define host {
   name                 _linux
   use                  generic-host
 }
+define service {
+  __WARNING            300
+  __CRITICAL           330
+  register             0
+  name                 _linux:nb-process
+  display_name         NB-PROCESS
+  use                  generic-service
+}
 
 #### testhost:_linux ####
 define host {
@@ -20,11 +28,3 @@ define service {
   use                  _linux:nb-process
 }
 
-define service {
-  __WARNING            300
-  __CRITICAL           330
-  register             0
-  name                 _linux:nb-process
-  display_name         NB-PROCESS
-  use                  generic-service
-}

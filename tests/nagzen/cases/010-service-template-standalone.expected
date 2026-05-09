@@ -19,6 +19,12 @@ define host {
   name                 _myhost
   use                  _linux
 }
+define service {
+  register             0
+  name                 _myhost:custom
+  display_name         CUSTOM
+  use                  my-custom-check
+}
 
 #### server1:_myhost ####
 define host {
@@ -34,9 +40,3 @@ define service {
   use                  _myhost:custom
 }
 
-define service {
-  register             0
-  name                 _myhost:custom
-  display_name         CUSTOM
-  use                  my-custom-check
-}

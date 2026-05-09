@@ -19,6 +19,12 @@ define host {
   name                 _test-linux
   use                  _os
 }
+define service {
+  register             0
+  name                 _test-linux:test-swap
+  display_name         TEST-SWAP
+  use                  snmp-test-swap
+}
 
 #### myhost:_test-linux ####
 define host {
@@ -35,9 +41,3 @@ define service {
   use                  _test-linux:test-swap
 }
 
-define service {
-  register             0
-  name                 _test-linux:test-swap
-  display_name         TEST-SWAP
-  use                  snmp-test-swap
-}

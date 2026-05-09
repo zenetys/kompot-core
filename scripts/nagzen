@@ -279,7 +279,15 @@ function propagate_standalone_reopen() {
       [[ ${desc_check} == "${svc_desc}" ]] && break
     done
 
+    # Restore extra args from original declaration to preserve explicit attrs
+    local saved_ifs="$IFS"
+    IFS=$'\x1f'
+    local -a extra_args=(${SERVICE_EXTRA_ARGS[${svc_key}]:-})
+    IFS="$saved_ifs"
+    [[ ${#extra_args[@]} == 1 && -z ${extra_args[0]} ]] && extra_args=()
+
     dump_nagios_object service \
+      "${extra_args[@]}" \
       "register=0" \
       "name=${new_template}" \
       "display_name=${display}" \
@@ -640,6 +648,11 @@ function host-service() {
     )
     # Store the 'use=' value for potential future overrides
     SERVICE_USE[${CURRENT_HOST}:${desc}]="${effective_use}"
+    # Store extra args for standalone reopen propagation
+    local saved_ifs="$IFS"
+    IFS=$'\x1f'
+    SERVICE_EXTRA_ARGS[${CURRENT_HOST}:${desc}]="$*"
+    IFS="$saved_ifs"
     # Always update SERVICES reference (no freeze - reopens propagate to all children)
     SERVICES[${CURRENT_HOST}:${desc}]="${template_name}"
     # Propagate updates to all child templates
@@ -720,6 +733,7 @@ declare -A SERVICES=( )
 # that need updating when the template is reopened.
 declare -A SERVICE_USE=( )
 declare -A SERVICE_OVERRIDE_COUNT=( )  # Tracks override count for intermediate templates
+declare -A SERVICE_EXTRA_ARGS=( )     # Stores explicit attrs from host template service declarations
 declare -A DISABLED=( )
 declare -A HOST_SERVICES=( )
 declare -A HOST_TEMPLATE=( )

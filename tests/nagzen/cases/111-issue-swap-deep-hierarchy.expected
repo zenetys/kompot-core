@@ -12,12 +12,40 @@ define host {
   name                 _linux
   use                  generic-host
 }
+define service {
+  register             0
+  name                 _linux:swap
+  display_name         SWAP
+  use                  snmp-linux-swap
+}
+define service {
+  __WARNING            300
+  __CRITICAL           330
+  register             0
+  name                 _linux:nb-process
+  display_name         NB-PROCESS
+  use                  generic-service
+}
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
 
 #### _custom-linux:_linux ####
 define host {
   register             0
   name                 _custom-linux
   use                  _linux
+}
+define service {
+  __PORT               2222
+  register             0
+  name                 _custom-linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
 }
 
 #### _my-custom:_custom-linux ####
@@ -56,31 +84,3 @@ define service {
   use                  _custom-linux:adm-ssh
 }
 
-define service {
-  register             0
-  name                 _linux:swap
-  display_name         SWAP
-  use                  snmp-linux-swap
-}
-define service {
-  __WARNING            300
-  __CRITICAL           330
-  register             0
-  name                 _linux:nb-process
-  display_name         NB-PROCESS
-  use                  generic-service
-}
-define service {
-  __PORT               22
-  register             0
-  name                 _linux:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
-define service {
-  __PORT               2222
-  register             0
-  name                 _custom-linux:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}

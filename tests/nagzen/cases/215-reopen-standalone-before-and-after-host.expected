@@ -1,5 +1,5 @@
 define service {
-  check_command        check-snmp-uptime
+  check_command        check-dummy
   __CRITICAL           86400
   register             0
   name                 snmp-uptime
@@ -12,10 +12,22 @@ define host {
   use                  generic-host
 }
 define service {
+  register             0
+  name                 _os:uptime
+  display_name         UPTIME
+  use                  snmp-uptime
+}
+define service {
   __CRITICAL           22
   register             0
   name                 snmp-uptime__1
   use                  snmp-uptime
+}
+define service {
+  register             0
+  name                 _os:uptime__1
+  display_name         UPTIME
+  use                  snmp-uptime__1
 }
 
 #### _sw-tplink ####
@@ -23,6 +35,12 @@ define host {
   register             0
   name                 _sw-tplink
   use                  generic-host
+}
+define service {
+  register             0
+  name                 _sw-tplink:uptime
+  display_name         UPTIME
+  use                  snmp-uptime__1
 }
 
 #### ad-dhcp:_os ####
@@ -36,7 +54,7 @@ define service {
   service_description  UPTIME
   display_name         UPTIME
   host_name            ad-dhcp
-  use                  _os:uptime
+  use                  _os:uptime__1
 }
 
 #### switch01:_sw-tplink ####
@@ -53,15 +71,3 @@ define service {
   use                  _sw-tplink:uptime
 }
 
-define service {
-  register             0
-  name                 _os:uptime
-  display_name         UPTIME
-  use                  snmp-uptime__1
-}
-define service {
-  register             0
-  name                 _sw-tplink:uptime
-  display_name         UPTIME
-  use                  snmp-uptime__1
-}

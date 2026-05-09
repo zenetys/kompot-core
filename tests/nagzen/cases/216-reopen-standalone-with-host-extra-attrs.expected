@@ -1,5 +1,5 @@
 define service {
-  check_command        check-connector
+  check_command        check-dummy
   __HOST               127.0.0.1
   __PORT               5700
   __TIMEOUT            30
@@ -35,6 +35,8 @@ define service {
   use                  my-connector
 }
 define service {
+  __PORT               5800
+  __LABEL              primary
   register             0
   name                 _mydevice:connector__1
   display_name         CONNECTOR

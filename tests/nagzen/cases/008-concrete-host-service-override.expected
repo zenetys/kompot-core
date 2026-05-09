@@ -11,6 +11,13 @@ define host {
   name                 _mytemplate
   use                  _linux
 }
+define service {
+  __PORT               22
+  register             0
+  name                 _mytemplate:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
 
 #### myserver:_mytemplate ####
 define host {
@@ -27,10 +34,3 @@ define service {
   use                  _mytemplate:adm-ssh
 }
 
-define service {
-  __PORT               22
-  register             0
-  name                 _mytemplate:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}

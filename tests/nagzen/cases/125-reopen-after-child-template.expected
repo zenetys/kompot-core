@@ -10,6 +10,12 @@ define host {
   name                 _linux
   use                  generic-host
 }
+define service {
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  adm-ssh
+}
 
 #### _debian:_linux ####
 define host {
@@ -56,9 +62,3 @@ define service {
   use                  _linux:adm-ssh__1
 }
 
-define service {
-  register             0
-  name                 _linux:adm-ssh__1
-  display_name         ADM-SSH
-  use                  adm-ssh
-}

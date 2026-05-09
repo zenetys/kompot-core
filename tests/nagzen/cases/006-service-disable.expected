@@ -4,14 +4,6 @@ define host {
   name                 _base
   use                  _linux
 }
-
-#### _derived:_base ####
-define host {
-  register             0
-  name                 _derived
-  use                  _base
-}
-
 define service {
   register             0
   name                 _base:adm-ssh
@@ -30,3 +22,11 @@ define service {
   display_name         MEM
   use                  generic-service
 }
+
+#### _derived:_base ####
+define host {
+  register             0
+  name                 _derived
+  use                  _base
+}
+

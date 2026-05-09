@@ -13,10 +13,22 @@ define host {
   use                  generic-host
 }
 define service {
+  register             0
+  name                 _linux:my-check
+  display_name         MY-CHECK
+  use                  my-check
+}
+define service {
   __CRIT               22
   register             0
   name                 my-check__1
   use                  my-check
+}
+define service {
+  register             0
+  name                 _linux:my-check__1
+  display_name         MY-CHECK
+  use                  my-check__1
 }
 
 #### server1:_linux ####
@@ -30,12 +42,6 @@ define service {
   service_description  MY-CHECK
   display_name         MY-CHECK
   host_name            server1
-  use                  _linux:my-check
+  use                  _linux:my-check__1
 }
 
-define service {
-  register             0
-  name                 _linux:my-check
-  display_name         MY-CHECK
-  use                  my-check__1
-}

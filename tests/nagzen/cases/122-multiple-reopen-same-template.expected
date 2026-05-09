@@ -4,6 +4,20 @@ define host {
   name                 _linux
   use                  generic-host
 }
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
+define service {
+  __WARNING            80
+  register             0
+  name                 _linux:cpu
+  display_name         CPU
+  use                  generic-service
+}
 
 define service {
   __PORT               2244
@@ -89,17 +103,3 @@ define service {
   use                  _linux:cpu__1
 }
 
-define service {
-  __PORT               22
-  register             0
-  name                 _linux:adm-ssh__2
-  display_name         ADM-SSH
-  use                  generic-service
-}
-define service {
-  __WARNING            80
-  register             0
-  name                 _linux:cpu__1
-  display_name         CPU
-  use                  generic-service
-}

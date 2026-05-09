@@ -11,12 +11,26 @@ define host {
   name                 _linux
   use                  _os
 }
+define service {
+  __PORT               22
+  register             0
+  name                 _linux:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
+}
 
 #### _linux-ssh2244:_linux ####
 define host {
   register             0
   name                 _linux-ssh2244
   use                  _linux
+}
+define service {
+  __PORT               2244
+  register             0
+  name                 _linux-ssh2244:adm-ssh
+  display_name         ADM-SSH
+  use                  generic-service
 }
 
 #### myserver:_linux-ssh2244 ####
@@ -33,17 +47,3 @@ define service {
   use                  _linux-ssh2244:adm-ssh
 }
 
-define service {
-  __PORT               22
-  register             0
-  name                 _linux:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
-define service {
-  __PORT               2244
-  register             0
-  name                 _linux-ssh2244:adm-ssh
-  display_name         ADM-SSH
-  use                  generic-service
-}
