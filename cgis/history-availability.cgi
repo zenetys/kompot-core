@@ -3,8 +3,10 @@
 # history-availability.cgi - Calculate availability percentage from history
 #
 # Parameters:
-#   hostname - Single mode: exact host. Bulk mode (all=1): case-insensitive substring filter.
-#   service  - Single mode: exact service. Bulk mode (all=1): case-insensitive substring filter.
+#   hostname - Single mode: exact host. Bulk mode (all=1): contains filter.
+#   service  - Single mode: exact service. Bulk mode (all=1): contains filter.
+#   query    - Bulk mode: unified filter syntax (see filter.cgi), e.g. "SRV-01",
+#              "hostname:~web", "-service:PING". Searches hostname + service.
 #   since    - Start timestamp (unix epoch, default: 30 days ago)
 #   before   - End timestamp (unix epoch, default: now)
 #   period   - Preset time range (overrides since/before): last-24h, yesterday, this-week, etc.
@@ -18,6 +20,8 @@
 #   - Ignored: UNKNOWN, UNREACHABLE states
 #   - Result: available / (available + unavailable) * 100
 #
+
+source ./filter.cgi
 
 HISTORY_DB=${KOMPOT_HISTORY_DB:-/var/lib/kompot/nagios/nagios-history.db}
 
@@ -58,11 +62,23 @@ TOTAL_PERIOD=$(( BEFORE - SINCE ))
 
 # Bulk mode: all host+service combinations
 if [[ $ALL == 1 ]]; then
-  # Optional substring filters (mirror the frontend's case-insensitive includes).
-  # HOSTNAME/SERVICE are already sanitized above, so no quote can be injected.
+  # Build optional filters from the unified query syntax shared with the
+  # sandbox/history views (see filter.cgi). Legacy hostname/service params are
+  # kept as contains-terms for backward compatibility. filter.cgi sanitizes and
+  # escapes every value, so the resulting clauses are injection-safe.
+  filter_parse "${_GET_query//[^a-zA-Z0-9._:\/ @#!,+-]}"
+  [[ $HOSTNAME ]] && filter_add "hostname:~$HOSTNAME"
+  [[ $SERVICE ]]  && filter_add "service:~$SERVICE"
+  FILTER_SEARCHABLE_FIELDS="hostname service"
+  filter_to_sql_clauses "hostname service"
+
+  # Join the generated clauses with AND so they can be spliced into the CTE and
+  # cache WHERE clauses. The time range is handled separately by the view, so
+  # no time term is added here.
   BULK_FILTER=""
-  [[ $HOSTNAME ]] && BULK_FILTER+=" AND hostname LIKE '%$HOSTNAME%'"
-  [[ $SERVICE ]] && BULK_FILTER+=" AND service LIKE '%$SERVICE%'"
+  for _fc in "${FILTER_SQL_CLAUSES[@]}"; do
+    BULK_FILTER+=" AND $_fc"
+  done
 
   # Convert timestamps to dates for cache lookup
   SINCE_DATE=$(date -u -d "@$SINCE" +%Y-%m-%d)
