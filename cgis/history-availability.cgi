@@ -3,12 +3,14 @@
 # history-availability.cgi - Calculate availability percentage from history
 #
 # Parameters:
-#   hostname - Host to query (optional, all hosts if omitted)
-#   service  - Service to query (optional, host availability if omitted)
+#   hostname - Single mode: exact host. Bulk mode (all=1): case-insensitive substring filter.
+#   service  - Single mode: exact service. Bulk mode (all=1): case-insensitive substring filter.
 #   since    - Start timestamp (unix epoch, default: 30 days ago)
 #   before   - End timestamp (unix epoch, default: now)
 #   period   - Preset time range (overrides since/before): last-24h, yesterday, this-week, etc.
 #   all      - If 1, return all host+service combinations (bulk mode)
+#   limit    - Bulk mode: max rows returned (default 100, capped at 1000)
+#   offset   - Bulk mode: rows to skip for pagination (default 0)
 #
 # Availability calculation:
 #   - Available: OK, WARNING, UP states
@@ -28,6 +30,12 @@ SINCE=${_GET_since//[^0-9]}
 BEFORE=${_GET_before//[^0-9]}
 PERIOD=${_GET_period//[^a-z0-9-]}
 ALL=${_GET_all//[^01]}
+LIMIT=${_GET_limit//[^0-9]}
+LIMIT=${LIMIT:-100}
+(( LIMIT < 1 )) && LIMIT=100
+(( LIMIT > 1000 )) && LIMIT=1000
+OFFSET=${_GET_offset//[^0-9]}
+OFFSET=${OFFSET:-0}
 
 # Handle period parameter (overrides since/before)
 if [[ $PERIOD ]]; then
@@ -50,6 +58,12 @@ TOTAL_PERIOD=$(( BEFORE - SINCE ))
 
 # Bulk mode: all host+service combinations
 if [[ $ALL == 1 ]]; then
+  # Optional substring filters (mirror the frontend's case-insensitive includes).
+  # HOSTNAME/SERVICE are already sanitized above, so no quote can be injected.
+  BULK_FILTER=""
+  [[ $HOSTNAME ]] && BULK_FILTER+=" AND hostname LIKE '%$HOSTNAME%'"
+  [[ $SERVICE ]] && BULK_FILTER+=" AND service LIKE '%$SERVICE%'"
+
   # Convert timestamps to dates for cache lookup
   SINCE_DATE=$(date -u -d "@$SINCE" +%Y-%m-%d)
   BEFORE_DATE=$(date -u -d "@$BEFORE" +%Y-%m-%d)
@@ -81,10 +95,10 @@ SELECT
     ELSE 100.0
   END as availability
 FROM availability_cache
-WHERE date >= '$SINCE_DATE' AND date < '$BEFORE_DATE'
+WHERE date >= '$SINCE_DATE' AND date < '$BEFORE_DATE'$BULK_FILTER
 GROUP BY hostname, service
 ORDER BY MAX(date) DESC
-LIMIT 100;
+LIMIT $LIMIT OFFSET $OFFSET;
 "
   else
     # Slow path: compute from raw state data
@@ -96,6 +110,7 @@ entities AS (
   FROM state
   WHERE timestamp >= datetime($SINCE, 'unixepoch')
     AND timestamp < datetime($BEFORE, 'unixepoch')
+    $BULK_FILTER
   GROUP BY hostname, service
 ),
 -- Get the last state before our time range for each entity
@@ -112,6 +127,7 @@ period_states AS (
   FROM state
   WHERE timestamp >= datetime($SINCE, 'unixepoch')
     AND timestamp < datetime($BEFORE, 'unixepoch')
+    $BULK_FILTER
 ),
 -- Combine: initial state (clamped to since) + period states
 all_states AS (
@@ -164,7 +180,7 @@ SELECT
 FROM pivoted p
 JOIN entities e ON p.hostname = e.hostname AND p.service IS e.service
 ORDER BY e.last_change DESC
-LIMIT 100;
+LIMIT $LIMIT OFFSET $OFFSET;
 "
   fi
 
