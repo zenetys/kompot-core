@@ -11,8 +11,12 @@
 #   before   - End timestamp (unix epoch, default: now)
 #   period   - Preset time range (overrides since/before): last-24h, yesterday, this-week, etc.
 #   all      - If 1, return all host+service combinations (bulk mode)
-#   limit    - Bulk mode: max rows returned (default 100, capped at 1000)
-#   offset   - Bulk mode: rows to skip for pagination (default 0)
+#   limit    - Bulk mode: max rows returned (optional; omitted = all rows)
+#   offset   - Bulk mode: rows to skip (optional, requires limit)
+#
+# Bulk responses are cached on disk for 5 minutes (dir: KOMPOT_CACHE_DIR,
+# default /tmp/kompot-availability-cache) keyed by period/range + filters, so
+# the full computation is reused across refreshes and client-side pagination.
 #
 # Availability calculation:
 #   - Available: OK, WARNING, UP states
@@ -34,12 +38,16 @@ SINCE=${_GET_since//[^0-9]}
 BEFORE=${_GET_before//[^0-9]}
 PERIOD=${_GET_period//[^a-z0-9-]}
 ALL=${_GET_all//[^01]}
+# limit/offset are optional; when omitted, bulk mode returns every matching
+# row (the view loads the full set and paginates client-side). The 5-minute
+# result cache below keeps that full computation cheap across refreshes.
 LIMIT=${_GET_limit//[^0-9]}
-LIMIT=${LIMIT:-100}
-(( LIMIT < 1 )) && LIMIT=100
-(( LIMIT > 1000 )) && LIMIT=1000
 OFFSET=${_GET_offset//[^0-9]}
-OFFSET=${OFFSET:-0}
+LIMIT_SQL=""
+if [[ $LIMIT ]]; then
+  LIMIT_SQL="LIMIT $LIMIT"
+  [[ $OFFSET ]] && LIMIT_SQL+=" OFFSET $OFFSET"
+fi
 
 # Handle period parameter (overrides since/before)
 if [[ $PERIOD ]]; then
@@ -62,11 +70,39 @@ TOTAL_PERIOD=$(( BEFORE - SINCE ))
 
 # Bulk mode: all host+service combinations
 if [[ $ALL == 1 ]]; then
+  # Sanitized query string, reused for both the filter and the cache key.
+  Q="${_GET_query//[^a-zA-Z0-9._:\/ @#!,+-]}"
+
+  # 5-minute result cache: the bulk computation is memoized on disk, keyed by
+  # the effective request (period/range + filters + limit/offset). Refreshes
+  # and client-side pagination within the TTL are served instantly from disk.
+  CACHE_TTL=300
+  CACHE_DIR=${KOMPOT_CACHE_DIR:-/tmp/kompot-availability-cache}
+  CACHE_FILE=""
+  if mkdir -p "$CACHE_DIR" 2>/dev/null; then
+    CACHE_KEY="${PERIOD:-$SINCE-$BEFORE}|$Q|$HOSTNAME|$SERVICE|$LIMIT|$OFFSET"
+    CACHE_HASH=$(printf '%s' "$CACHE_KEY" | md5sum | cut -d' ' -f1)
+    CACHE_FILE="$CACHE_DIR/avail-$CACHE_HASH.json"
+    if [[ -f $CACHE_FILE ]]; then
+      CACHE_AGE=$(( NOW - $(stat -c %Y "$CACHE_FILE") ))
+      if (( CACHE_AGE >= 0 && CACHE_AGE < CACHE_TTL )); then
+        header "Status: 200"
+        header "Content-Type: application/json"
+        header "X-Cache: HIT"
+        header --send
+        cat "$CACHE_FILE"
+        exit 0
+      fi
+    fi
+    # Drop expired entries so the cache directory stays bounded.
+    find "$CACHE_DIR" -maxdepth 1 -name 'avail-*' -mmin +5 -delete 2>/dev/null
+  fi
+
   # Build optional filters from the unified query syntax shared with the
   # sandbox/history views (see filter.cgi). Legacy hostname/service params are
   # kept as contains-terms for backward compatibility. filter.cgi sanitizes and
   # escapes every value, so the resulting clauses are injection-safe.
-  filter_parse "${_GET_query//[^a-zA-Z0-9._:\/ @#!,+-]}"
+  filter_parse "$Q"
   [[ $HOSTNAME ]] && filter_add "hostname:~$HOSTNAME"
   [[ $SERVICE ]]  && filter_add "service:~$SERVICE"
   FILTER_SEARCHABLE_FIELDS="hostname service"
@@ -114,7 +150,7 @@ FROM availability_cache
 WHERE date >= '$SINCE_DATE' AND date < '$BEFORE_DATE'$BULK_FILTER
 GROUP BY hostname, service
 ORDER BY MAX(date) DESC
-LIMIT $LIMIT OFFSET $OFFSET;
+$LIMIT_SQL;
 "
   else
     # Slow path: compute from raw state data
@@ -196,37 +232,49 @@ SELECT
 FROM pivoted p
 JOIN entities e ON p.hostname = e.hostname AND p.service IS e.service
 ORDER BY e.last_change DESC
-LIMIT $LIMIT OFFSET $OFFSET;
+$LIMIT_SQL;
 "
   fi
 
+  # Build the JSON body into a temp file so it can be cached atomically (mv).
+  BODY_TMP=$(mktemp "$CACHE_DIR/avail-tmp-XXXXXX" 2>/dev/null) || BODY_TMP=$(mktemp)
+  {
+    echo "{"
+    echo "  \"from\": \"$FROM_DATE\","
+    echo "  \"to\": \"$TO_DATE\","
+    echo "  \"total_period\": $TOTAL_PERIOD,"
+    echo "  \"cached\": $(if (( USE_CACHE )); then echo "true"; else echo "false"; fi),"
+    echo "  \"data\": ["
+
+    first=1
+    sqlite3 -separator '|' "$HISTORY_DB" "$SQL" | while IFS='|' read -r host svc avail unavail unk pct; do
+      (( first )) || echo ","
+      first=0
+      svc_json=$(if [[ $svc ]]; then echo "\"$svc\""; else echo "null"; fi)
+      # Truncate decimals for integer durations
+      avail=${avail%.*}
+      unavail=${unavail%.*}
+      unk=${unk%.*}
+      echo -n "    {\"hostname\":\"$host\",\"service\":$svc_json,\"availability\":$pct,\"available\":${avail:-0},\"unavailable\":${unavail:-0},\"unknown\":${unk:-0}}"
+    done
+
+    echo ""
+    echo "  ]"
+    echo "}"
+  } > "$BODY_TMP"
+
   header "Status: 200"
   header "Content-Type: application/json"
+  header "X-Cache: MISS"
   header --send
 
-  # Execute and format as JSON array
-  echo "{"
-  echo "  \"from\": \"$FROM_DATE\","
-  echo "  \"to\": \"$TO_DATE\","
-  echo "  \"total_period\": $TOTAL_PERIOD,"
-  echo "  \"cached\": $(if (( USE_CACHE )); then echo "true"; else echo "false"; fi),"
-  echo "  \"data\": ["
-
-  first=1
-  sqlite3 -separator '|' "$HISTORY_DB" "$SQL" | while IFS='|' read -r host svc avail unavail unk pct; do
-    (( first )) || echo ","
-    first=0
-    svc_json=$(if [[ $svc ]]; then echo "\"$svc\""; else echo "null"; fi)
-    # Truncate decimals for integer durations
-    avail=${avail%.*}
-    unavail=${unavail%.*}
-    unk=${unk%.*}
-    echo -n "    {\"hostname\":\"$host\",\"service\":$svc_json,\"availability\":$pct,\"available\":${avail:-0},\"unavailable\":${unavail:-0},\"unknown\":${unk:-0}}"
-  done
-
-  echo ""
-  echo "  ]"
-  echo "}"
+  # Promote the temp file into the cache (if available), then stream it.
+  if [[ $CACHE_FILE ]] && mv -f "$BODY_TMP" "$CACHE_FILE" 2>/dev/null; then
+    cat "$CACHE_FILE"
+  else
+    cat "$BODY_TMP"
+    rm -f "$BODY_TMP"
+  fi
   exit 0
 fi
 
