@@ -1,7 +1,12 @@
 #!/bin/bash
 
-exec 2>/tmp/${0##*/}.debug
-set -x
+if [[ ${DEBUG:-0} != 0 ]]; then
+  debug_file="/var/log/kompot/${0##*/}.debug"
+  touch "$debug_file"
+  chmod 600 "$debug_file"
+  exec 2>> "$debug_file"
+  set -x
+fi
 
 SNMPTRAPD_CONF=/var/lib/snmp/snmptrapd.local.conf
 
