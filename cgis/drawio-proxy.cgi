@@ -8,8 +8,17 @@ function header() {
 
 DATADIR="${DRAWIO_DATADIR:-/var/www/html}"
 
-# get query string parameters
-declare ${QUERY_STRING//&/$IFS}
+# get query string parameters (explicit allow-list, never let the client
+# override arbitrary shell variables such as DATADIR)
+url=""
+base64=0
+IFS='&' read -ra _params <<< "$QUERY_STRING"
+for _kv in "${_params[@]}"; do
+  case ${_kv%%=*} in
+    url)    url=${_kv#*=} ;;
+    base64) base64=${_kv#*=} ;;
+  esac
+done
 
 # protect url
 url=${url//[^[:alnum:]+_.-]/_}
