@@ -23,6 +23,18 @@ done
 # protect url
 url=${url//[^[:alnum:]+_.-]/_}
 
+# defense in depth: the resolved file must stay under DATADIR
+_realfile=$(realpath -m -- "$DATADIR/$url.xml")
+case $_realfile in
+  "$DATADIR"/*) ;;
+  *)
+    header "Status: 400"
+    header "X-Error: invalid url"
+    header ""
+    exit 1
+    ;;
+esac
+
 if [[ ! -r $DATADIR/$url.xml ]]; then
   header "Status: 400"
   header "X-Error: $url not found"
